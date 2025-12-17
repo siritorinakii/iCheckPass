@@ -159,21 +159,6 @@ e.preventDefault(); selectRole('Teacher'); } });
 studentCard.addEventListener('click', () => selectRole('Student'));
 studentCard.addEventListener('keydown', e => { if(e.key==='Enter'||e.key===' ') {
 e.preventDefault(); selectRole('Student'); } });
-continueToDashboardBtn.addEventListener('click', () => {
-if (!selectedRole) return;
-roleSelection.classList.add('hidden');
-if(selectedRole==='Teacher') {
-pageHistory.push(roleSelection, teacherVerifySection);
-teacherVerifySection.classList.remove('hidden');
-}
-else if(selectedRole==='Student') {
-pageHistory.push(roleSelection, studentInfoSection);
-studentInfoSection.classList.remove('hidden');
-studentInfoForm.reset();
-submitStudentInfoBtn.disabled = true;
-}
-updateBackButton();
-});
 // Student Information Flow
 let studentData = {};
 studentInfoForm.addEventListener('input', () => {
