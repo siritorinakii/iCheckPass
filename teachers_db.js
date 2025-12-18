@@ -1,27 +1,91 @@
 const SIMPLE_TEACHERS = [
     {
         id: 1,
-        username: "Jhino Lazaro",
+        username: "sir.jhino",
         password: "icpmeyc2025",
         fullName: "Jhino Lazaro",
-        department: "ICT department",
+        position: "ICP Teacher",
         welcomeMessage:"Welcome Sir Jhino Lazaro! Your class awaits."
     },
     {
         id: 2,
-        username: "troy", 
-        password: "masarap",
-        fullName: "Troy Monterola",
-        department: "ICT Department",
+        username: "sir.allen", 
+        password: "icpmeyc2025",
+        fullName: "Allen Jay Cruz",
+        position: "ICP SHS Teacher",
         welcomeMessage: "Welcome Sir Troy! Your class awaits."
     },
     {
         id: 3,
-        username: "ian",
-        password: "pogi",
+        username: "sir.zyreel",
+        password: "icpmeyc2025",
         fullName: "Jillian Navarro",
-        department: "Academic Strand",
-        welcomeMessage: "Good day Sir Jillian! Let's make today productive!"
+        position: "ICP SHS Teacher",
+        welcomeMessage: "Good day Sir Zy! Let's make today productive!"
+    },
+    {
+    id: 4,
+    username: "sir.chester",
+    password: "icpmeyc2025",
+    fullName: "Chester Pineda",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome Sir Chester! Your students are all set!"
+    },
+    {
+    id: 5,
+    username: "maam.julie",
+    password: "icpmeyc2025",
+    fullName: "Julie Ann Victoriano",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome Ma'am Julie! Ready for another great lesson?"
+    },
+    {
+    id: 6,
+    username: "sir.paulo",
+    password: "icpmeyc2025",
+    fullName: "Paulo Gatbonton",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome Sir Paulo! Let’s make today awesome!"
+    },
+    {
+    id: 7,
+    username: "maam.cherielyn",
+    password: "icpmeyc2025",
+    fullName: "Cherielyn Surio",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome Ma’am Cherielyn! Let the learning begin!"
+    },
+    {
+    id: 8,
+    username: "sir.charlie",
+    password: "history2025",
+    fullName: "Charlie Leal Mercader",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome Sir Charlie! Ready to learn and have fun"
+    },
+    {
+    id: 9,
+    username: "maam.georgi",
+    password: "pecoach",
+    fullName: "Georgi Dela Peña",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome athletes! Ready for some exercise?"
+    },
+    {
+    id: 10,
+    username: "sir.reymark",
+    password: "icpmeyc2025",
+    fullName: "Reymark Dacillo",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome Sir Reymark! Ready to learn and have fun"
+    },
+    {
+    id: 11,
+    username: "maam.jacquilyn",
+    password: "icpmeyc2025",
+    fullName: "Jacquilyn Musni",
+    position: "ICP SHS Teacher",
+    welcomeMessage: "Welcome to Computer class! Time to code!"
     }
 ];
 
@@ -36,7 +100,7 @@ window.SimpleLogin = {
                 id: teacher.id,
                 username: teacher.username,
                 fullName: teacher.fullName,
-                department: teacher.department,
+                position: teacher.position, // CHANGED: department -> position
                 welcomeMessage: teacher.welcomeMessage
             }));
             
@@ -48,7 +112,7 @@ window.SimpleLogin = {
                     id: teacher.id,
                     username: teacher.username,
                     fullName: teacher.fullName,
-                    department: teacher.department,
+                    position: teacher.position, // CHANGED: department -> position
                     welcomeMessage: teacher.welcomeMessage
                 }
             };
@@ -418,6 +482,10 @@ window.TeacherBackup = {
     }
 };
 
+// ==============================================
+// INITIALIZATION
+// ==============================================
+
 // Initialize teacher data on first load
 (function initTeacherStorage() {
     // Create empty scan arrays for each teacher if they don't exist
@@ -430,6 +498,8 @@ window.TeacherBackup = {
     
     console.log('Teacher storage initialized');
 })();
+
+// Add this to teachers_db.js after the existing functions:
 
 // Get teacher display name
 SimpleLogin.getTeacherName = function() {
@@ -449,8 +519,8 @@ SimpleLogin.isTeacherLoggedIn = function(username) {
     return currentTeacher && currentTeacher.username === username;
 };
 
-// Get teacher department
+// Get teacher position (CHANGED: department -> position)
 SimpleLogin.getTeacherDepartment = function() {
     const currentTeacher = this.getCurrentTeacher();
-    return currentTeacher ? currentTeacher.department : null;
+    return currentTeacher ? currentTeacher.position : null; // CHANGED: .position
 };

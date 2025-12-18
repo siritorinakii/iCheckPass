@@ -172,14 +172,15 @@ submitStudentInfoBtn.disabled = !allFilled;
 });
 studentInfoForm.addEventListener('submit', e => {
     e.preventDefault();
-    studentData = {
-        name: studentInfoForm.studentName.value.trim(),
-        number: studentInfoForm.studentNumber.value.trim(),
-        strandCategory: strandCategorySelect.value,
-        strand: strandSelect.value,
-        grade: document.getElementById('studentGrade').value,
-        section: document.getElementById('studentSection').value.trim()
-    };
+    // In studentInfoForm submit event:
+studentData = {
+    name: studentInfoForm.studentName.value.trim(),
+    number: studentInfoForm.studentNumber.value.trim(),
+    strandCategory: strandCategorySelect.value,
+    strand: strandSelect.value,
+    grade: document.getElementById('studentGrade').value, // ADD THIS
+    section: studentInfoForm.section.value.trim()
+};
     
     pageHistory.push(studentInfoConfirmSection);
     studentInfoSection.classList.add('hidden');
@@ -188,6 +189,7 @@ studentInfoForm.addEventListener('submit', e => {
     confirmNumber.textContent = "Student Number: " + studentData.number;
     confirmStrandCategory.textContent = "Strand Category: " + studentData.strandCategory;
     confirmStrand.textContent = "Strand: " + studentData.strand;
+    // In confirmYesBtn click event:
     confirmGrade.textContent = "Grade: " + studentData.grade; // ADD THIS
     confirmSection.textContent = "Section: " + studentData.section;
     updateBackButton();
@@ -217,7 +219,6 @@ confirmNoBtn.addEventListener('click', () => {
     studentInfoSection.classList.remove('hidden');
     updateBackButton();
 });
-
 // IDAGDAG ANG EVENT LISTENER NA ITO PARA SA confirmYesBtn:
 confirmYesBtn.addEventListener('click', () => {
     // Generate QR Code from studentData
@@ -1597,7 +1598,7 @@ function showTeacherWelcomeModal(teacher) {
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                             </svg>
-                            <span class="text-sm font-medium">${teacher.department || 'Senior High School'}</span>
+                          <span class="text-sm font-medium">${teacher.position || 'Senior High School'}</span>
                         </div>
                         
                         <div class="flex items-center gap-2 text-gray-500 dark:text-gray-400">
@@ -2997,23 +2998,25 @@ function exportDashboardCSV() {
     }
     
     // CSV Headers
-    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand Category,Strand,Section,Teacher\n';
+    let csv = 'Timestamp,Student Name,Student Number,Grade,Strand,Section,Teacher\n'; // REORDERED
     
     scannedCodes.forEach(scan => {
         try {
             const data = JSON.parse(scan.data);
             const teacherName = teacher ? teacher.fullName : localStorage.getItem('teacher_name') || 'Unknown';
             
+            // FIX: Check multiple possible grade field names
+            const grade = data.grade || data.studentGrade || data.student_grade || data.Grade || 'N/A';
+            
             csv += `"${scan.timestamp}",`;
             csv += `"${data.name || ''}",`;
             csv += `"${data.number || ''}",`;
-            csv += `"${data.grade || data.studentGrade || ''}",`; // GRADE LEVEL ADDED
-            csv += `"${data.strandCategory || ''}",`;
+            csv += `"${grade}",`; // USE THE FIXED GRADE
             csv += `"${data.strand || ''}",`;
             csv += `"${data.section || ''}",`;
             csv += `"${teacherName}"\n`;
         } catch (e) {
-            csv += `"${scan.timestamp}","Invalid QR Code","","","","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
+            csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
         }
     });
     
@@ -3026,7 +3029,7 @@ function exportDashboardCSV() {
     a.click();
     URL.revokeObjectURL(url);
     
-    alert(`Exported ${scannedCodes.length} records to CSV (including Grade Level)`);
+    alert(`Exported ${scannedCodes.length} records to CSV`);
 }
 
 qrDoneBtn.addEventListener('click', () => {
