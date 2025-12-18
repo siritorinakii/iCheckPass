@@ -418,10 +418,6 @@ window.TeacherBackup = {
     }
 };
 
-// ==============================================
-// INITIALIZATION
-// ==============================================
-
 // Initialize teacher data on first load
 (function initTeacherStorage() {
     // Create empty scan arrays for each teacher if they don't exist
@@ -434,8 +430,6 @@ window.TeacherBackup = {
     
     console.log('Teacher storage initialized');
 })();
-
-// Add this to teachers_db.js after the existing functions:
 
 // Get teacher display name
 SimpleLogin.getTeacherName = function() {
