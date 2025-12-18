@@ -58,7 +58,7 @@ const SIMPLE_TEACHERS = [
     {
     id: 8,
     username: "sir.charlie",
-    password: "history2025",
+    password: "icpmeyc2025",
     fullName: "Charlie Leal Mercader",
     position: "ICP SHS Teacher",
     welcomeMessage: "Welcome Sir Charlie! Ready to learn and have fun"
@@ -66,7 +66,7 @@ const SIMPLE_TEACHERS = [
     {
     id: 9,
     username: "maam.georgi",
-    password: "pecoach",
+    password: "icpmeyc2025",
     fullName: "Georgi Dela Peña",
     position: "ICP SHS Teacher",
     welcomeMessage: "Welcome athletes! Ready for some exercise?"
@@ -100,7 +100,7 @@ window.SimpleLogin = {
                 id: teacher.id,
                 username: teacher.username,
                 fullName: teacher.fullName,
-                position: teacher.position, // CHANGED: department -> position
+                position: teacher.position,
                 welcomeMessage: teacher.welcomeMessage
             }));
             
@@ -112,7 +112,7 @@ window.SimpleLogin = {
                     id: teacher.id,
                     username: teacher.username,
                     fullName: teacher.fullName,
-                    position: teacher.position, // CHANGED: department -> position
+                    position: teacher.position,
                     welcomeMessage: teacher.welcomeMessage
                 }
             };
