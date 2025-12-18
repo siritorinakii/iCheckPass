@@ -19,7 +19,7 @@ const SIMPLE_TEACHERS = [
         id: 3,
         username: "sir.zyreel",
         password: "icpmeyc2025",
-        fullName: "Jillian Navarro",
+        fullName: "Zyreel Liquiran",
         position: "ICP SHS Teacher",
         welcomeMessage: "Good day Sir Zy! Let's make today productive!"
     },
@@ -120,7 +120,7 @@ window.SimpleLogin = {
         
         return {
             success: false,
-            message: "Mali ang username o password"
+            message: "Wrong username or password"
         };
     },
     
