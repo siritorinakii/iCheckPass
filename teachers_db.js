@@ -85,7 +85,7 @@ const SIMPLE_TEACHERS = [
     password: "icpmeyc2025",
     fullName: "Cristina Singcol",
     position: "ICP SHS Teacher",
-    welcomeMessage: "Welcome Ma’am Jacquilyn! We’re ready for today’s lessons"
+    welcomeMessage: "Welcome Ma’am Singcol! Ready for today’s lessons?"
     }
 ];
 
