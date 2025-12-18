@@ -13,7 +13,7 @@ const SIMPLE_TEACHERS = [
         password: "icpmeyc2025",
         fullName: "Allen Jay Cruz",
         position: "ICP SHS Teacher",
-        welcomeMessage: "Welcome Sir Troy! Your class awaits."
+        welcomeMessage: "Welcome Sir Allen! new day, new knowledge"
     },
     {
         id: 3,
@@ -77,7 +77,7 @@ const SIMPLE_TEACHERS = [
     password: "icpmeyc2025",
     fullName: "Reymark Dacillo",
     position: "ICP SHS Teacher",
-    welcomeMessage: "Welcome Sir Reymark! Ready to learn and have fun"
+    welcomeMessage: "Welcome Sir Reymark! Ready to learn and have fun?"
     },
     {
     id: 11,
@@ -85,7 +85,7 @@ const SIMPLE_TEACHERS = [
     password: "icpmeyc2025",
     fullName: "Jacquilyn Musni",
     position: "ICP SHS Teacher",
-    welcomeMessage: "Welcome to Computer class! Time to code!"
+    welcomeMessage: "Welcome Ma’am Jacquilyn! We’re ready for today’s lessons"
     }
 ];
 
