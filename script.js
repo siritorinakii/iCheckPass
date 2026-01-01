@@ -2859,7 +2859,7 @@ document.getElementById('contactForm')?.addEventListener('submit', function(e) {
     localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
     
     // Show confirmation
-    alert('Thank you for your feedback! Opening email client...');
+    alert('Thank you for your feedback!');
     
     // Clear form
     this.reset();
