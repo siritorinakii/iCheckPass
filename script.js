@@ -3443,44 +3443,69 @@ if (studentDashboardBtn && studentDashboardSection) {
     updateStudentDashboardButton();
 }
 
-// Function to update student dashboard
+// Function to update student dashboard - FIXED VERSION
 function updateStudentDashboard(studentData) {
     if (!studentDashboardSection || !studentData) return;
     
+    console.log('Updating student dashboard for:', studentData.name);
+    console.log('Student number:', studentData.number);
+    
     // Get all scanned codes
     const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
+    console.log('Total scans in storage:', scannedCodes.length);
     
     // Filter scans for this specific student
     const studentScans = scannedCodes.filter(scan => {
         try {
             const data = JSON.parse(scan.data);
-            return data.number === studentData.number;
+            const isMatch = data.number === studentData.number;
+            if (isMatch) {
+                console.log('Found match:', data.name, 'scanned by:', data.scannedBy);
+            }
+            return isMatch;
+        } catch (e) {
+            console.error('Error parsing scan:', e);
+            return false;
+        }
+    });
+    
+    console.log('Student scans found:', studentScans.length);
+    
+    // Get today's scans
+    const today = new Date().toDateString();
+    const todayScans = studentScans.filter(scan => {
+        try {
+            const scanDate = new Date(scan.timestamp).toDateString();
+            return scanDate === today;
         } catch (e) {
             return false;
         }
     });
     
-    // Get today's scans
-    const today = new Date().toDateString();
-    const todayScans = studentScans.filter(scan => {
-        const scanDate = new Date(scan.timestamp).toDateString();
-        return scanDate === today;
-    });
+    console.log('Today scans:', todayScans.length);
     
     // Update stats
-    document.getElementById('totalAttendance').textContent = studentScans.length;
-    document.getElementById('todayAttendance').textContent = todayScans.length;
+    const totalAttendanceEl = document.getElementById('totalAttendance');
+    const todayAttendanceEl = document.getElementById('todayAttendance');
+    const lastScanTimeEl = document.getElementById('studentLastScanTime');
+    
+    if (totalAttendanceEl) totalAttendanceEl.textContent = studentScans.length;
+    if (todayAttendanceEl) todayAttendanceEl.textContent = todayScans.length;
     
     // Update last scan time
-    if (studentScans.length > 0) {
+    if (studentScans.length > 0 && lastScanTimeEl) {
         const lastScan = studentScans[0];
-        const lastTime = new Date(lastScan.timestamp).toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-        document.getElementById('studentLastScanTime').textContent = lastTime;
-    } else {
-        document.getElementById('studentLastScanTime').textContent = 'Never';
+        try {
+            const lastTime = new Date(lastScan.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            lastScanTimeEl.textContent = lastTime;
+        } catch (e) {
+            lastScanTimeEl.textContent = 'Recently';
+        }
+    } else if (lastScanTimeEl) {
+        lastScanTimeEl.textContent = 'Never';
     }
     
     // Update attendance history
@@ -3493,31 +3518,61 @@ function updateStudentDashboard(studentData) {
             return;
         }
         
+        console.log('Displaying', studentScans.length, 'scans in history');
+        
         // Show latest first
-        studentScans.slice().reverse().forEach(scan => {
+        studentScans.slice().reverse().forEach((scan, index) => {
             try {
                 const data = JSON.parse(scan.data);
-                const scanTime = new Date(scan.timestamp).toLocaleString();
+                console.log('Scan data:', data);
                 
+                // Format scan time
+                let scanTime = 'Unknown time';
+                try {
+                    scanTime = new Date(scan.timestamp).toLocaleString('en-PH', {
+                        weekday: 'short',
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                } catch (e) {
+                    scanTime = 'Recent scan';
+                }
+                
+                // Create scan item
                 const scanItem = document.createElement('div');
-                scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left';
+                scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left mb-3';
                 scanItem.innerHTML = `
                     <div class="flex justify-between items-start">
-                        <div>
-                            <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
-                            <p class="text-sm text-gray-600 dark:text-gray-400">Teacher: ${data.scannedBy || 'Unknown'}</p>
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-1">
+                                <svg class="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
+                            </div>
+                            <div class="text-sm text-gray-600 dark:text-gray-400">
+                                <span class="font-medium">Teacher:</span> ${data.scannedBy || 'Teacher'}
+                            </div>
+                            <div class="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                <span class="font-medium">Class:</span> ${data.strand || ''} - ${data.section || ''}
+                            </div>
                         </div>
-                        <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+                        <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium ml-2">
                             Present
                         </span>
                     </div>
                 `;
                 historyContainer.appendChild(scanItem);
             } catch (e) {
-                console.error('Error parsing scan data:', e);
+                console.error('Error displaying scan:', e);
             }
         });
     }
+    
+    console.log('Dashboard update complete');
 }
 
 if (teacherConfirmBtn) {
