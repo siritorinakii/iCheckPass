@@ -172,45 +172,75 @@ submitStudentInfoBtn.disabled = !allFilled;
 });
 studentInfoForm.addEventListener('submit', e => {
     e.preventDefault();
-    // In studentInfoForm submit event:
-studentData = {
-    name: studentInfoForm.studentName.value.trim(),
-    number: studentInfoForm.studentNumber.value.trim(),
-    strandCategory: strandCategorySelect.value,
-    strand: strandSelect.value,
-    grade: document.getElementById('studentGrade').value, // ADD THIS
-    section: studentInfoForm.section.value.trim()
-};
+    
+    // ✅ DAPAT GANITO - MAY GRADE:
+    studentData = {
+        name: document.getElementById('studentName').value.trim(),
+        number: document.getElementById('studentNumber').value.trim(),
+        strandCategory: strandCategorySelect.value,
+        strand: strandSelect.value,
+        grade: document.getElementById('studentGrade').value, // ✅ ITO ANG DAGDAG
+        section: document.getElementById('studentSection').value
+    };
+    
+    console.log("Student Data with Grade:", studentData); // Remove this if using SPCK
     
     pageHistory.push(studentInfoConfirmSection);
     studentInfoSection.classList.add('hidden');
     studentInfoConfirmSection.classList.remove('hidden');
+    
+    // ✅ DAPAT MAY GRADE DIN DITO:
     confirmName.textContent = "Name: " + studentData.name;
     confirmNumber.textContent = "Student Number: " + studentData.number;
     confirmStrandCategory.textContent = "Strand Category: " + studentData.strandCategory;
     confirmStrand.textContent = "Strand: " + studentData.strand;
-    // In confirmYesBtn click event:
-    confirmGrade.textContent = "Grade: " + studentData.grade; // ADD THIS
+    confirmGrade.textContent = "Grade: " + studentData.grade; // ✅ ITO IMPORTANTE
     confirmSection.textContent = "Section: " + studentData.section;
+    
     updateBackButton();
 });
 confirmYesBtn.addEventListener('click', () => {
-pageHistory.push(qrCodeSection);
-studentInfoConfirmSection.classList.add('hidden');
-qrCodeSection.classList.remove('hidden');
-qrDoneBtn.disabled = false;
-const qrData = JSON.stringify(studentData);
-if (!localStorage.getItem("studentQR")) {
-localStorage.setItem("studentQR", qrData);
-}
-document.getElementById("qrcode").innerHTML = "";
-qrcode = new QRCode(document.getElementById("qrcode"), {
-text: localStorage.getItem("studentQR"),
-width: 250,
-height: 250
-});
-document.getElementById("troubleSection").classList.remove("hidden");
-updateBackButton();
+    // Make sure ALL student data is included
+    studentData = {
+        name: document.getElementById('studentName').value.trim(),
+        number: document.getElementById('studentNumber').value.trim(),
+        strandCategory: document.getElementById('strandCategory').value,
+        strand: document.getElementById('strand').value,
+        grade: document.getElementById('studentGrade').value, // ADD THIS LINE
+        section: document.getElementById('studentSection').value
+    };
+    
+    const qrData = JSON.stringify(studentData);
+    
+    // Clear previous QR code
+    document.getElementById("qrcode").innerHTML = "";
+    
+    // Generate new QR code
+    qrcode = new QRCode(document.getElementById("qrcode"), {
+        text: qrData,
+        width: 250,
+        height: 250,
+        colorDark: "#000000",
+        colorLight: "#ffffff"
+    });
+    
+    // Save to localStorage
+    localStorage.setItem("studentQR", qrData);
+    
+    // Navigate to QR section
+    pageHistory.push(qrCodeSection);
+    studentInfoConfirmSection.classList.add('hidden');
+    qrCodeSection.classList.remove('hidden');
+    
+    // Enable QR Done button
+    qrDoneBtn.disabled = false;
+    qrDoneBtn.classList.remove('btn-disabled');
+    qrDoneBtn.classList.add('btn-primary');
+    
+    updateBackButton();
+    
+    // Show trouble section
+    document.getElementById('troubleSection').classList.remove('hidden');
 });
 
 confirmNoBtn.addEventListener('click', () => {
@@ -219,6 +249,7 @@ confirmNoBtn.addEventListener('click', () => {
     studentInfoSection.classList.remove('hidden');
     updateBackButton();
 });
+
 // IDAGDAG ANG EVENT LISTENER NA ITO PARA SA confirmYesBtn:
 confirmYesBtn.addEventListener('click', () => {
     // Generate QR Code from studentData
@@ -921,7 +952,7 @@ function openModal(track) {
 }
 
 function showSections(strand, gradeNum) {
-    selectedGrade = gradeNum === 11 ? "Grade 11" : "Grade 12";
+    selectedGrade = gradeNum === 11 ? "11" : "12";
     sectionButtons.innerHTML = "";
     const count = sectionsCount[strand]?.[gradeNum] || 1;
 
@@ -2198,7 +2229,7 @@ function updateDashboardTable() {
                                 ${data.name || 'Unknown'}
                             </div>
                             <div class="text-xs text-gray-500 dark:text-gray-400">
-                                ${data.grade || data.studentGrade || 'N/A'}
+                                ${data.grade || 'N/A'}
                             </div>
                         </div>
                     </div>
@@ -2213,11 +2244,11 @@ function updateDashboardTable() {
                         ${data.strand || 'N/A'}
                     </div>
                 </td>
-                <td class="px-6 py-4 whitespace-nowrap">
-                    <div class="text-sm text-gray-900 dark:text-gray-300">
-                        ${data.grade || data.studentGrade || 'N/A'}
-                    </div>
-                </td>
+<td class="px-6 py-4 whitespace-nowrap">
+    <div class="text-sm text-gray-900 dark:text-gray-300">
+        ${data.grade || 'N/A'}
+    </div>
+</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     <div class="text-sm text-gray-900 dark:text-gray-300">
                         ${data.section || 'N/A'}
@@ -2284,7 +2315,7 @@ function viewStudentDetails(encodedData) {
                             <!-- Grade -->
                             <div class="space-y-1">
                                 <p class="text-xs text-gray-500 dark:text-gray-400 font-medium">Grade Level</p>
-                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">${data.grade || data.studentGrade || 'N/A'}</p>
+                                <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">${data.grade || 'N/A'}</p>
                             </div>
                             
                             <!-- Strand Category -->
@@ -2399,7 +2430,7 @@ function deleteScan(qrData) {
     }
 }
 
-// Export Dashboard to CSV
+// FIXED VERSION - replace lines ~1990-2005
 function exportDashboardCSV() {
     const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
     const teacher = SimpleLogin.getCurrentTeacher();
@@ -2409,23 +2440,25 @@ function exportDashboardCSV() {
         return;
     }
     
-    // CSV Headers
-    let csv = 'Timestamp,Student Name,Student Number,Strand,Grade,Section,Teacher\n';
+    // CSV Headers - GRADE LEVEL FIXED
+    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Teacher\n';
     
     scannedCodes.forEach(scan => {
         try {
             const data = JSON.parse(scan.data);
             const teacherName = teacher ? teacher.fullName : localStorage.getItem('teacher_name') || 'Unknown';
             
+            const grade = data.grade  || 'N/A';
+            
             csv += `"${scan.timestamp}",`;
             csv += `"${data.name || ''}",`;
             csv += `"${data.number || ''}",`;
+            csv += `"${grade}",`;
             csv += `"${data.strand || ''}",`;
-            csv += `"${data.grade || data.studentGrade || ''}",`; // GRADE LEVEL
             csv += `"${data.section || ''}",`;
             csv += `"${teacherName}"\n`;
         } catch (e) {
-            csv += `"${scan.timestamp}","Invalid QR Code","","","","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
+            csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
         }
     });
     
@@ -2916,7 +2949,7 @@ function viewStudentDetails(encodedData) {
                         <div class="grid grid-cols-2 gap-4">
                             <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Grade Level</p>
-                                <p class="font-medium text-gray-800 dark:text-gray-200">${data.grade || data.studentGrade || 'N/A'}</p>
+                                <p class="font-medium text-gray-800 dark:text-gray-200">${data.grade || 'N/A'}</p>
                             </div>
                             <div class="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
                                 <p class="text-xs text-gray-500 dark:text-gray-400">Strand Category</p>
@@ -2987,50 +3020,6 @@ function deleteScan(encodedData, index) {
     }
 }
 
-// Export Dashboard to CSV
-function exportDashboardCSV() {
-    const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
-    const teacher = SimpleLogin.getCurrentTeacher();
-    
-    if (scannedCodes.length === 0) {
-        alert('No data to export!');
-        return;
-    }
-    
-    // CSV Headers
-    let csv = 'Timestamp,Student Name,Student Number,Grade,Strand,Section,Teacher\n'; // REORDERED
-    
-    scannedCodes.forEach(scan => {
-        try {
-            const data = JSON.parse(scan.data);
-            const teacherName = teacher ? teacher.fullName : localStorage.getItem('teacher_name') || 'Unknown';
-            
-            // FIX: Check multiple possible grade field names
-            const grade = data.grade || data.studentGrade || data.student_grade || data.Grade || 'N/A';
-            
-            csv += `"${scan.timestamp}",`;
-            csv += `"${data.name || ''}",`;
-            csv += `"${data.number || ''}",`;
-            csv += `"${grade}",`; // USE THE FIXED GRADE
-            csv += `"${data.strand || ''}",`;
-            csv += `"${data.section || ''}",`;
-            csv += `"${teacherName}"\n`;
-        } catch (e) {
-            csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
-        }
-    });
-    
-    // Create and download CSV
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `attendance_${new Date().toISOString().slice(0,10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    
-    alert(`Exported ${scannedCodes.length} records to CSV`);
-}
 
 qrDoneBtn.addEventListener('click', () => {
     // Go back to ROLE SELECTION (not title page)
