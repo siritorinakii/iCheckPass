@@ -832,49 +832,75 @@ overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 const code = jsQR(imageData.data, imageData.width, imageData.height);
    if (code && code.data !== lastScannedCode) {
-        lastScannedCode = code.data;
-
-        let studentInfo = {};
-        try {
-            studentInfo = JSON.parse(code.data);
-        } catch (e) {
-            studentInfo = { name: "Invalid QR Code", number: "N/A" };
+    lastScannedCode = code.data;
+    
+    let studentInfo = {};
+    try {
+        studentInfo = JSON.parse(code.data);
+    } catch (e) {
+        studentInfo = { name: "Invalid QR Code", number: "N/A" };
+    }
+    
+    // Get current teacher name - FIXED
+    const teacher = SimpleLogin.getCurrentTeacher();
+    if (teacher) {
+        studentInfo.scannedBy = teacher.fullName || teacher.username;
+    } else {
+        // Fallback to teacher name from current class session
+        const classInfo = JSON.parse(localStorage.getItem('currentClassInfo') || '{}');
+        if (classInfo.teacherName) {
+            studentInfo.scannedBy = classInfo.teacherName;
+        } else {
+            studentInfo.scannedBy = "Teacher"; // Default
         }
-        
-        // Get current teacher name
-        const teacher = SimpleLogin.getCurrentTeacher();
-        if (teacher) {
-            studentInfo.scannedBy = teacher.fullName || teacher.username;
-        }
-        
-        // Save the updated data
-        const updatedQRData = JSON.stringify(studentInfo);
-
-    // Success Modal (Fake saved!)
+    }
+    
+    // IMPORTANT: Save the UPDATED data with teacher name
+    const updatedQRData = JSON.stringify(studentInfo);
+    
+    // Success Modal
     qrModalText.innerHTML = `
         <div class="text-center">
             <p class="text-2xl font-bold text-green-600">${studentInfo.name || 'Unknown Student'}</p>
             <p class="text-lg text-gray-700">${studentInfo.number || ''}</p>
-            <p class="text-sm text-green-500 font-bold mt-2">Saved Locally!</p>
+            <p class="text-sm text-green-500 font-bold mt-2">Saved by ${studentInfo.scannedBy || 'Teacher'}!</p>
         </div>
     `;
     qrModal.classList.remove('hidden');
-
-    // Saved locally (offline backup)
-    const timestamp = new Date().toLocaleString();
-    if (!scannedCodes.some(item => item.data === code.data)) {
+    
+    // Saved locally - SAVE THE UPDATED DATA WITH TEACHER NAME
+    const timestamp = new Date().toISOString(); // Use ISO for consistency
+    
+    // Check if this student was already scanned today
+    const isNewScan = !scannedCodes.some(item => {
+        try {
+            const existingData = JSON.parse(item.data);
+            return existingData.number === studentInfo.number &&
+                new Date(item.timestamp).toDateString() === new Date().toDateString();
+        } catch (e) {
+            return false;
+        }
+    });
+    
+    if (isNewScan) {
         scannedCodes.unshift({
-            data: code.data,
+            data: updatedQRData, // Save UPDATED data with teacher name
             timestamp: timestamp,
             name: studentInfo.name || 'Unknown'
         });
-        // Keep only last 10
-        if (scannedCodes.length > 10) scannedCodes.pop();
-
+        
+        // Keep only last 50 scans
+        if (scannedCodes.length > 50) scannedCodes.pop();
+        
         localStorage.setItem('scannedQRCodes', JSON.stringify(scannedCodes));
         renderScannedCodes();
+        
+        // Also save to teacher-specific storage
+        if (teacher) {
+            TeacherStorage.saveScan(teacher.id, updatedQRData);
+        }
     }
-
+    
     // Auto-hide after 2.5 seconds
     setTimeout(() => {
         qrModal.classList.add('hidden');
