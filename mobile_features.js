@@ -132,3 +132,46 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Simple server simulation using localStorage sync
+class SimpleServer {
+    constructor() {
+        this.key = 'icheckpass_server_data';
+        this.init();
+    }
+
+    init() {
+        if (!localStorage.getItem(this.key)) {
+            localStorage.setItem(this.key, JSON.stringify({
+                scans: [],
+                students: [],
+                teachers: []
+            }));
+        }
+    }
+
+    // Add scan (works cross-device)
+    addScan(scanData) {
+        const data = JSON.parse(localStorage.getItem(this.key));
+        data.scans.unshift({
+            ...scanData,
+            device: navigator.userAgent,
+            timestamp: new Date().toISOString()
+        });
+        localStorage.setItem(this.key, JSON.stringify(data));
+        return true;
+    }
+
+    // Get student scans
+    getStudentScans(studentNumber) {
+        const data = JSON.parse(localStorage.getItem(this.key));
+        return data.scans.filter(scan => 
+            scan.data && JSON.parse(scan.data).number === studentNumber
+        );
+    }
+}
+
+window.Server = new SimpleServer();
+
+// Usage:
+// Instead of localStorage, use: Server.addScan(scanData)
+// Instead of filtering, use: Server.getStudentScans(studentNumber)
