@@ -833,7 +833,7 @@ const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 const code = jsQR(imageData.data, imageData.width, imageData.height);
    if (code && code.data !== lastScannedCode) {
     lastScannedCode = code.data;
-    
+
     let studentInfo = {};
     try {
         studentInfo = JSON.parse(code.data);
@@ -857,7 +857,7 @@ const code = jsQR(imageData.data, imageData.width, imageData.height);
     
     // IMPORTANT: Save the UPDATED data with teacher name
     const updatedQRData = JSON.stringify(studentInfo);
-    
+
     // Success Modal
     qrModalText.innerHTML = `
         <div class="text-center">
@@ -867,7 +867,7 @@ const code = jsQR(imageData.data, imageData.width, imageData.height);
         </div>
     `;
     qrModal.classList.remove('hidden');
-    
+
     // Saved locally - SAVE THE UPDATED DATA WITH TEACHER NAME
     const timestamp = new Date().toISOString(); // Use ISO for consistency
     
@@ -875,8 +875,8 @@ const code = jsQR(imageData.data, imageData.width, imageData.height);
     const isNewScan = !scannedCodes.some(item => {
         try {
             const existingData = JSON.parse(item.data);
-            return existingData.number === studentInfo.number &&
-                new Date(item.timestamp).toDateString() === new Date().toDateString();
+            return existingData.number === studentInfo.number && 
+                   new Date(item.timestamp).toDateString() === new Date().toDateString();
         } catch (e) {
             return false;
         }
@@ -891,16 +891,11 @@ const code = jsQR(imageData.data, imageData.width, imageData.height);
         
         // Keep only last 50 scans
         if (scannedCodes.length > 50) scannedCodes.pop();
-        
+
         localStorage.setItem('scannedQRCodes', JSON.stringify(scannedCodes));
         renderScannedCodes();
-        
-        // Also save to teacher-specific storage
-        if (teacher) {
-            TeacherStorage.saveScan(teacher.id, updatedQRData);
-        }
     }
-    
+
     // Auto-hide after 2.5 seconds
     setTimeout(() => {
         qrModal.classList.add('hidden');
@@ -3529,6 +3524,7 @@ if (teacherConfirmBtn) {
     teacherConfirmBtn.addEventListener('click', function() {
         console.log('Continue to Scanner clicked');
         
+        const teacher = SimpleLogin.getCurrentTeacher();
         const classInfo = {
             section: teacherData.section,
             grade: teacherData.grade,
@@ -3536,7 +3532,9 @@ if (teacherConfirmBtn) {
             date: teacherData.date,
             schedule: teacherData.schedule,
             late: teacherData.late,
-            absent: teacherData.absent
+            absent: teacherData.absent,
+            teacherName: teacher ? teacher.fullName : 'Teacher',
+            teacherId: teacher ? teacher.id : null
         };
         
         localStorage.setItem('currentClassInfo', JSON.stringify(classInfo));
@@ -3551,6 +3549,19 @@ if (teacherConfirmBtn) {
             renderScannedCodes();
         }
         
-        console.log('Navigated to scanner section');
+        console.log('Navigated to scanner section with teacher info:', classInfo.teacherName);
     });
 }
+
+// Add this at the very end of script.js
+document.addEventListener('DOMContentLoaded', function() {
+    // Ensure teacher name is saved to class info when logged in
+    const teacher = SimpleLogin.getCurrentTeacher();
+    if (teacher) {
+        let classInfo = JSON.parse(localStorage.getItem('currentClassInfo') || '{}');
+        if (!classInfo.teacherName) {
+            classInfo.teacherName = teacher.fullName;
+            localStorage.setItem('currentClassInfo', JSON.stringify(classInfo));
+        }
+    }
+});
