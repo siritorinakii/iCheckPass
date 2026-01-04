@@ -952,7 +952,7 @@ function openModal(track) {
 }
 
 function showSections(strand, gradeNum) {
-    selectedGrade = gradeNum === 11 ? "11" : "12";
+    selectedGrade = gradeNum === 11 ? "Grade 11" : "Grade 12";
     sectionButtons.innerHTML = "";
     const count = sectionsCount[strand]?.[gradeNum] || 1;
 
