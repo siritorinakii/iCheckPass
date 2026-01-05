@@ -843,6 +843,25 @@ if (code && code.data !== lastScannedCode) {
     } catch (e) {
         studentInfo = { name: "Invalid QR Code", number: "N/A" };
     }
+   
+   // Sa scanQR() function, idagdag ito pagkatapos mag-save:
+// AFTER saving to scannedCodes, add:
+
+// Save to shared storage for student
+AttendanceSync.saveScanForStudent(studentInfo.number, {
+    studentName: studentInfo.name,
+    studentNumber: studentInfo.number,
+    strand: studentInfo.strand,
+    section: studentInfo.section,
+    grade: studentInfo.grade,
+    scannedBy: studentInfo.scannedBy || 'Unknown Teacher',
+    scannedByUsername: studentInfo.scannedByUsername || '',
+    timestamp: new Date().toISOString(),
+    location: 'School',
+    type: 'QR Scan'
+});
+
+console.log(`Scan saved for student ${studentInfo.number}`);
     
     // DAGDAGAN NG TEACHER NAME DITO:
     // Get current teacher
@@ -3428,38 +3447,29 @@ if (studentDashboardBtn && studentDashboardSection) {
     updateStudentDashboardButton();
 }
 
-// Function to update student dashboard
+// Palitan ang buong updateStudentDashboard() function:
+
 function updateStudentDashboard(studentData) {
     if (!studentDashboardSection || !studentData) return;
     
-    // Get all scanned codes
-    const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
+    // GET FROM SHARED STORAGE (not from scannedCodes)
+    const studentAttendance = AttendanceSync.getStudentAttendance(studentData.number);
     
-    // Filter scans for this specific student
-    const studentScans = scannedCodes.filter(scan => {
-        try {
-            const data = JSON.parse(scan.data);
-            return data.number === studentData.number;
-        } catch (e) {
-            return false;
-        }
-    });
+    // Update stats
+    document.getElementById('totalAttendance').textContent = studentAttendance.length;
     
     // Get today's scans
     const today = new Date().toDateString();
-    const todayScans = studentScans.filter(scan => {
-        const scanDate = new Date(scan.timestamp).toDateString();
+    const todayScans = studentAttendance.filter(scan => {
+        const scanDate = new Date(scan.timestamp || scan.syncTime).toDateString();
         return scanDate === today;
     });
-    
-    // Update stats
-    document.getElementById('totalAttendance').textContent = studentScans.length;
     document.getElementById('todayAttendance').textContent = todayScans.length;
     
     // Update last scan time
-    if (studentScans.length > 0) {
-        const lastScan = studentScans[0];
-        const lastTime = new Date(lastScan.timestamp).toLocaleTimeString([], {
+    if (studentAttendance.length > 0) {
+        const lastScan = studentAttendance[0];
+        const lastTime = new Date(lastScan.timestamp || lastScan.syncTime).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit'
         });
@@ -3473,36 +3483,32 @@ function updateStudentDashboard(studentData) {
     if (historyContainer) {
         historyContainer.innerHTML = '';
         
-        if (studentScans.length === 0) {
+        if (studentAttendance.length === 0) {
             historyContainer.innerHTML = '<p class="text-gray-500 dark:text-gray-400 italic py-8">No attendance records yet</p>';
             return;
         }
         
         // Show latest first
-        studentScans.slice().reverse().forEach(scan => {
-            try {
-                const data = JSON.parse(scan.data);
-                const scanTime = new Date(scan.timestamp).toLocaleString();
-                
-                // Sa updateStudentDashboard() function (hanapin sa dulo ng file):
-const scanItem = document.createElement('div');
-scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left';
-scanItem.innerHTML = `
-    <div class="flex justify-between items-start">
-        <div>
-            <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
-            <!-- I-UPDATE DITO: -->
-            <p class="text-sm text-gray-600 dark:text-gray-400">Teacher: ${data.scannedBy || 'Unknown'}</p>
-        </div>
-        <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
-            Present
-        </span>
-    </div>
-`;
-                historyContainer.appendChild(scanItem);
-            } catch (e) {
-                console.error('Error parsing scan data:', e);
-            }
+        studentAttendance.forEach(scan => {
+            const scanTime = new Date(scan.timestamp || scan.syncTime).toLocaleString();
+            
+            const scanItem = document.createElement('div');
+            scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left mb-3';
+            scanItem.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Teacher: ${scan.scannedBy || 'Unknown'}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            ${scan.strand || ''} • ${scan.section || ''}
+                        </p>
+                    </div>
+                    <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+                        Present
+                    </span>
+                </div>
+            `;
+            historyContainer.appendChild(scanItem);
         });
     }
 }
@@ -3536,3 +3542,83 @@ if (teacherConfirmBtn) {
         console.log('Navigated to scanner section');
     });
 }
+
+
+// Idagdag sa script.js - para ma-notify ang student kapag may bagong scan
+
+function checkForNewScans(studentNumber) {
+    const lastCheckTime = localStorage.getItem(`lastCheck_${studentNumber}`);
+    const studentAttendance = AttendanceSync.getStudentAttendance(studentNumber);
+    
+    if (studentAttendance.length > 0) {
+        const latestScan = studentAttendance[0];
+        const scanTime = new Date(latestScan.timestamp || latestScan.syncTime).getTime();
+        const lastCheck = lastCheckTime ? parseInt(lastCheckTime) : 0;
+        
+        // If new scan since last check
+        if (scanTime > lastCheck) {
+            showNewScanNotification(latestScan);
+            localStorage.setItem(`lastCheck_${studentNumber}`, Date.now().toString());
+        }
+    }
+}
+
+function showNewScanNotification(scan) {
+    // Create notification
+    const notification = document.createElement('div');
+    notification.id = 'newScanNotification';
+    notification.className = 'fixed top-20 right-4 z-[99999] animate-slideInRight';
+    notification.innerHTML = `
+        <div class="bg-gradient-to-r from-green-50 to-blue-50 dark:from-gray-800 dark:to-gray-800 rounded-xl shadow-xl border border-green-200 dark:border-green-800 p-4 max-w-sm">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <div class="flex-1">
+                    <h4 class="font-bold text-gray-800 dark:text-gray-100 text-sm mb-1">New Attendance Recorded!</h4>
+                    <p class="text-gray-600 dark:text-gray-300 text-xs">
+                        Scanned by <strong>${scan.scannedBy || 'Teacher'}</strong>
+                    </p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        ${new Date(scan.timestamp || scan.syncTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                    </p>
+                </div>
+                <button onclick="document.getElementById('newScanNotification').remove()" class="text-gray-400 hover:text-gray-600">
+                    ✕
+                </button>
+            </div>
+        </div>
+    `;
+    
+    // Add to page
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Add animation
+const style = document.createElement('style');
+style.textContent = `
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(100%);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    .animate-slideInRight {
+        animation: slideInRight 0.3s ease-out;
+    }
+`;
+document.head.appendChild(style);

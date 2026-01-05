@@ -175,3 +175,101 @@ window.Server = new SimpleServer();
 // Usage:
 // Instead of localStorage, use: Server.addScan(scanData)
 // Instead of filtering, use: Server.getStudentScans(studentNumber)
+
+// mobile_features.js - ADD THIS AT THE BOTTOM
+
+// ==============================================
+// CROSS-DEVICE ATTENDANCE SYNC
+// ==============================================
+
+const AttendanceSync = {
+    // Key for shared attendance data
+    sharedKey: 'icheckpass_shared_attendance',
+    
+    // Save scan to shared storage (para makita ng student)
+    saveScanForStudent(studentNumber, scanData) {
+        const sharedData = this.getSharedData();
+        
+        if (!sharedData[studentNumber]) {
+            sharedData[studentNumber] = [];
+        }
+        
+        // Add scan to student's history
+        sharedData[studentNumber].unshift({
+            ...scanData,
+            syncTime: new Date().toISOString()
+        });
+        
+        // Keep only last 50 scans per student
+        if (sharedData[studentNumber].length > 50) {
+            sharedData[studentNumber].pop();
+        }
+        
+        this.saveSharedData(sharedData);
+        return true;
+    },
+    
+    // Get student's attendance history
+    getStudentAttendance(studentNumber) {
+        const sharedData = this.getSharedData();
+        return sharedData[studentNumber] || [];
+    },
+    
+    // Get all shared data
+    getSharedData() {
+        try {
+            const data = localStorage.getItem(this.sharedKey);
+            return data ? JSON.parse(data) : {};
+        } catch (e) {
+            return {};
+        }
+    },
+    
+    // Save shared data
+    saveSharedData(data) {
+        try {
+            localStorage.setItem(this.sharedKey, JSON.stringify(data));
+            return true;
+        } catch (e) {
+            console.error('Error saving shared data:', e);
+            return false;
+        }
+    },
+    
+    // Clear old data (older than 30 days)
+    cleanupOldData() {
+        const sharedData = this.getSharedData();
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        Object.keys(sharedData).forEach(studentNumber => {
+            sharedData[studentNumber] = sharedData[studentNumber].filter(scan => {
+                const scanDate = new Date(scan.timestamp || scan.syncTime);
+                return scanDate > thirtyDaysAgo;
+            });
+            
+            if (sharedData[studentNumber].length === 0) {
+                delete sharedData[studentNumber];
+            }
+        });
+        
+        this.saveSharedData(sharedData);
+    },
+    
+    // Export student's data for backup
+    exportStudentData(studentNumber) {
+        const attendance = this.getStudentAttendance(studentNumber);
+        return JSON.stringify({
+            studentNumber: studentNumber,
+            totalScans: attendance.length,
+            attendance: attendance,
+            exportDate: new Date().toISOString()
+        }, null, 2);
+    }
+};
+
+// Add to global scope
+window.AttendanceSync = AttendanceSync;
+
+// Cleanup old data on startup
+AttendanceSync.cleanupOldData();
