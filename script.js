@@ -833,55 +833,63 @@ ctx.drawImage(teacherVideo, 0, 0, canvas.width, canvas.height);
 overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 const code = jsQR(imageData.data, imageData.width, imageData.height);
-// Hanapin ang scanQR() function (around line 740-780) at palitan ang part na ito:
 if (code && code.data !== lastScannedCode) {
     lastScannedCode = code.data;
 
     let studentInfo = {};
     try {
         studentInfo = JSON.parse(code.data);
+        
+        // ✅ IMPORTANTE: SAVE TO TEACHER ACCOUNT
+        const currentTeacher = SimpleLogin.getCurrentTeacher();
+        if (currentTeacher) {
+            // 1. Save to teacher's personal records
+            SimpleLogin.saveTeacherScan(currentTeacher.id, studentInfo);
+            
+            // 2. ALSO save to global for teacher's view (optional)
+            const teacherName = currentTeacher.fullName;
+            
+            // Add teacher info to THIS SCAN ONLY for display
+            studentInfo.scannedBy = teacherName;
+            studentInfo.scannedByTeacherId = currentTeacher.id;
+            
+        } else {
+            studentInfo.scannedBy = "Unknown Teacher";
+        }
+        
     } catch (e) {
-        studentInfo = { name: "Invalid QR Code", number: "N/A" };
+        studentInfo = { 
+            name: "Invalid QR Code", 
+            number: "N/A",
+            scannedBy: "Unknown Teacher"
+        };
     }
     
-    // SAVE TEACHER NAME (HINDI I-DISPLAY SA MODAL)
-    const teacher = SimpleLogin.getCurrentTeacher();
-    if (teacher) {
-        studentInfo.scannedBy = teacher.fullName || teacher.username;
-        studentInfo.scannedByUsername = teacher.username;
-        studentInfo.scannedById = teacher.id;
-    }
-    
-    // Save the updated data (WITH TEACHER INFO)
     const updatedQRData = JSON.stringify(studentInfo);
 
-// I-update ang modal (WALANG TEACHER NAME DITO)
-qrModalText.innerHTML = `
-    <div class="text-center">
-        <p class="text-2xl font-bold text-green-600">${studentInfo.name || 'Unknown Student'}</p>
-        <p class="text-lg text-gray-700">${studentInfo.number || ''}</p>
-        <p class="text-sm text-green-500 font-bold mt-2">Attendance Recorded!</p>
-    </div>
-`;
+    // Simple modal (walang teacher name kung ayaw mo)
+    qrModalText.innerHTML = `
+        <div class="text-center">
+            <p class="text-2xl font-bold text-green-600">${studentInfo.name || 'Unknown Student'}</p>
+            <p class="text-lg text-gray-700">${studentInfo.number || ''}</p>
+            <p class="text-sm text-green-500 font-bold mt-2">✓ Attendance Recorded</p>
+        </div>
+    `;
+    
     qrModal.classList.remove('hidden');
 
-    // Saved locally (offline backup)
+    // Save to global scans (WITH TEACHER INFO)
     const timestamp = new Date().toLocaleString();
-    // Sa parehong function, hanapin ang pag-save at palitan ng:
-if (!scannedCodes.some(item => item.data === updatedQRData)) {
     scannedCodes.unshift({
-        data: updatedQRData, // SAVE DATA WITH TEACHER INFO
+        data: updatedQRData,
         timestamp: timestamp,
         name: studentInfo.name || 'Unknown'
     });
-        // Keep only last 10
-        if (scannedCodes.length > 10) scannedCodes.pop();
+    
+    if (scannedCodes.length > 50) scannedCodes.pop();
+    localStorage.setItem('scannedQRCodes', JSON.stringify(scannedCodes));
+    renderScannedCodes();
 
-        localStorage.setItem('scannedQRCodes', JSON.stringify(scannedCodes));
-        renderScannedCodes();
-    }
-
-    // Auto-hide after 2.5 seconds
     setTimeout(() => {
         qrModal.classList.add('hidden');
         lastScannedCode = null;
@@ -2446,8 +2454,8 @@ function exportDashboardCSV() {
         return;
     }
     
-// I-update ang CSV headers:
-let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Scanned By Teacher\n';
+    // CSV Headers - GRADE LEVEL FIXED
+    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Teacher\n';
     
     scannedCodes.forEach(scan => {
         try {
@@ -2462,7 +2470,6 @@ let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Scan
             csv += `"${grade}",`;
             csv += `"${data.strand || ''}",`;
             csv += `"${data.section || ''}",`;
-            csv += `"${data.scannedBy || 'Unknown Teacher'}"\n`; // ADD TEACHER NAME HERE
             csv += `"${teacherName}"\n`;
         } catch (e) {
             csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
@@ -2635,8 +2642,6 @@ function printDashboard() {
                         <th>Grade</th>
                         <th>Section</th>
                         <th>Scan Time</th>
-                        <th>Teacher
-                   </th>
                     </tr>
                 </thead>
                 <tbody>
@@ -2656,7 +2661,6 @@ function printDashboard() {
                                     <td>${data.grade || 'N/A'}</td>
                                     <td>${data.section || 'N/A'}</td>
                                     <td>${time}</td>
-                                <td>${data.scannedBy || 'Unknown Teacher'}</td> <!-- ADD TEACHER HERE -->
                                 </tr>
                             `;
                         } catch (e) {
@@ -2989,20 +2993,6 @@ function viewStudentDetails(encodedData) {
                         <button onclick="document.getElementById('studentDetailsModal').remove()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition">
                             Close
                         </button>
-                    // Sa student details modal, idagdag ito (around line 1700-1750):
-<div class="bg-blue-50 dark:bg-gray-800 rounded-lg p-4 mb-4">
-    <p class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">Attendance Information</p>
-    <div class="grid grid-cols-2 gap-3">
-        <div class="space-y-1">
-            <p class="text-xs text-gray-500 dark:text-gray-400">Scanned By</p>
-            <p class="text-sm font-semibold text-gray-800 dark:text-gray-200">${data.scannedBy || 'Unknown Teacher'}</p>
-        </div>
-        <div class="space-y-1">
-            <p class="text-xs text-gray-500 dark:text-gray-400">Teacher ID</p>
-            <p class="text-sm font-mono text-gray-800 dark:text-gray-200">${data.scannedByUsername || 'N/A'}</p>
-        </div>
-    </div>
-</div>
                     </div>
                 </div>
             </div>
@@ -3450,34 +3440,24 @@ if (studentDashboardBtn && studentDashboardSection) {
 function updateStudentDashboard(studentData) {
     if (!studentDashboardSection || !studentData) return;
     
-    // Get all scanned codes
-    const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
+    // ✅ KUNIN FROM SHARED STORAGE (hindi sa global scannedQRCodes)
+    const studentKey = `student_${studentData.number}_scans`;
+    const studentScans = JSON.parse(localStorage.getItem(studentKey) || '[]');
     
-    // Filter scans for this specific student
-    const studentScans = scannedCodes.filter(scan => {
-        try {
-            const data = JSON.parse(scan.data);
-            return data.number === studentData.number;
-        } catch (e) {
-            return false;
-        }
-    });
+    // Update stats
+    document.getElementById('totalAttendance').textContent = studentScans.length;
     
     // Get today's scans
     const today = new Date().toDateString();
     const todayScans = studentScans.filter(scan => {
-        const scanDate = new Date(scan.timestamp).toDateString();
+        const scanDate = new Date(scan.scanTime).toDateString();
         return scanDate === today;
     });
-    
-    // Update stats
-    document.getElementById('totalAttendance').textContent = studentScans.length;
     document.getElementById('todayAttendance').textContent = todayScans.length;
     
-    // Update last scan time
+    // Last scan time
     if (studentScans.length > 0) {
-        const lastScan = studentScans[0];
-        const lastTime = new Date(lastScan.timestamp).toLocaleTimeString([], {
+        const lastTime = new Date(studentScans[0].scanTime).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit'
         });
@@ -3497,30 +3477,26 @@ function updateStudentDashboard(studentData) {
         }
         
         // Show latest first
-        studentScans.slice().reverse().forEach(scan => {
-            try {
-                const data = JSON.parse(scan.data);
-                const scanTime = new Date(scan.timestamp).toLocaleString();
-                
-                // Sa updateStudentDashboard() function (hanapin sa dulo ng file):
-const scanItem = document.createElement('div');
-scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left';
-// Hanapin ang scanItem.innerHTML at i-update:
-scanItem.innerHTML = `
-    <div class="flex justify-between items-start">
-        <div>
-            <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
-            <p class="text-sm text-gray-600 dark:text-gray-400">Teacher: ${data.scannedBy || 'Unknown Teacher'}</p>
-        </div>
-        <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
-            Present
-        </span>
-    </div>
-`;
-                historyContainer.appendChild(scanItem);
-            } catch (e) {
-                console.error('Error parsing scan data:', e);
-            }
+        studentScans.forEach(scan => {
+            const scanTime = new Date(scan.scanTime).toLocaleString();
+            
+            const scanItem = document.createElement('div');
+            scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left mb-3';
+            scanItem.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                            Teacher: <strong>${scan.teacherName || 'Unknown'}</strong>
+                        </p>
+                        ${scan.subject ? `<p class="text-xs text-gray-500 dark:text-gray-400">${scan.subject}</p>` : ''}
+                    </div>
+                    <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+                        Present
+                    </span>
+                </div>
+            `;
+            historyContainer.appendChild(scanItem);
         });
     }
 }
