@@ -833,63 +833,55 @@ ctx.drawImage(teacherVideo, 0, 0, canvas.width, canvas.height);
 overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 const code = jsQR(imageData.data, imageData.width, imageData.height);
+   // Hanapin ang linyang ito (around line 720-760):
 if (code && code.data !== lastScannedCode) {
     lastScannedCode = code.data;
 
     let studentInfo = {};
     try {
         studentInfo = JSON.parse(code.data);
-        
-        // ✅ IMPORTANTE: SAVE TO TEACHER ACCOUNT
-        const currentTeacher = SimpleLogin.getCurrentTeacher();
-        if (currentTeacher) {
-            // 1. Save to teacher's personal records
-            SimpleLogin.saveTeacherScan(currentTeacher.id, studentInfo);
-            
-            // 2. ALSO save to global for teacher's view (optional)
-            const teacherName = currentTeacher.fullName;
-            
-            // Add teacher info to THIS SCAN ONLY for display
-            studentInfo.scannedBy = teacherName;
-            studentInfo.scannedByTeacherId = currentTeacher.id;
-            
-        } else {
-            studentInfo.scannedBy = "Unknown Teacher";
-        }
-        
     } catch (e) {
-        studentInfo = { 
-            name: "Invalid QR Code", 
-            number: "N/A",
-            scannedBy: "Unknown Teacher"
-        };
+        studentInfo = { name: "Invalid QR Code", number: "N/A" };
     }
     
+    // DAGDAGAN NG TEACHER NAME DITO:
+    // Get current teacher
+    const teacher = SimpleLogin.getCurrentTeacher();
+    if (teacher) {
+        studentInfo.scannedBy = teacher.fullName || teacher.username;
+        studentInfo.scannedByUsername = teacher.username;
+    }
+    
+    // Save the updated data
     const updatedQRData = JSON.stringify(studentInfo);
 
-    // Simple modal (walang teacher name kung ayaw mo)
-    qrModalText.innerHTML = `
-        <div class="text-center">
-            <p class="text-2xl font-bold text-green-600">${studentInfo.name || 'Unknown Student'}</p>
-            <p class="text-lg text-gray-700">${studentInfo.number || ''}</p>
-            <p class="text-sm text-green-500 font-bold mt-2">✓ Attendance Recorded</p>
-        </div>
-    `;
-    
+// Success Modal with Teacher Name
+qrModalText.innerHTML = `
+    <div class="text-center">
+        <p class="text-2xl font-bold text-green-600">${studentInfo.name || 'Unknown Student'}</p>
+        <p class="text-lg text-gray-700">${studentInfo.number || ''}</p>
+        ${studentInfo.scannedBy ? `<p class="text-sm text-blue-600 mt-1">Scanned by: <strong>${studentInfo.scannedBy}</strong></p>` : ''}
+        <p class="text-sm text-green-500 font-bold mt-2">Attendance Recorded!</p>
+    </div>
+`;
     qrModal.classList.remove('hidden');
 
-    // Save to global scans (WITH TEACHER INFO)
+    // Saved locally (offline backup)
     const timestamp = new Date().toLocaleString();
-    scannedCodes.unshift({
-        data: updatedQRData,
-        timestamp: timestamp,
-        name: studentInfo.name || 'Unknown'
-    });
-    
-    if (scannedCodes.length > 50) scannedCodes.pop();
-    localStorage.setItem('scannedQRCodes', JSON.stringify(scannedCodes));
-    renderScannedCodes();
+    if (!scannedCodes.some(item => item.data === code.data)) {
+        scannedCodes.unshift({
+            data: code.data,
+            timestamp: timestamp,
+            name: studentInfo.name || 'Unknown'
+        });
+        // Keep only last 10
+        if (scannedCodes.length > 10) scannedCodes.pop();
 
+        localStorage.setItem('scannedQRCodes', JSON.stringify(scannedCodes));
+        renderScannedCodes();
+    }
+
+    // Auto-hide after 2.5 seconds
     setTimeout(() => {
         qrModal.classList.add('hidden');
         lastScannedCode = null;
@@ -3440,24 +3432,34 @@ if (studentDashboardBtn && studentDashboardSection) {
 function updateStudentDashboard(studentData) {
     if (!studentDashboardSection || !studentData) return;
     
-    // ✅ KUNIN FROM SHARED STORAGE (hindi sa global scannedQRCodes)
-    const studentKey = `student_${studentData.number}_scans`;
-    const studentScans = JSON.parse(localStorage.getItem(studentKey) || '[]');
+    // Get all scanned codes
+    const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
     
-    // Update stats
-    document.getElementById('totalAttendance').textContent = studentScans.length;
+    // Filter scans for this specific student
+    const studentScans = scannedCodes.filter(scan => {
+        try {
+            const data = JSON.parse(scan.data);
+            return data.number === studentData.number;
+        } catch (e) {
+            return false;
+        }
+    });
     
     // Get today's scans
     const today = new Date().toDateString();
     const todayScans = studentScans.filter(scan => {
-        const scanDate = new Date(scan.scanTime).toDateString();
+        const scanDate = new Date(scan.timestamp).toDateString();
         return scanDate === today;
     });
+    
+    // Update stats
+    document.getElementById('totalAttendance').textContent = studentScans.length;
     document.getElementById('todayAttendance').textContent = todayScans.length;
     
-    // Last scan time
+    // Update last scan time
     if (studentScans.length > 0) {
-        const lastTime = new Date(studentScans[0].scanTime).toLocaleTimeString([], {
+        const lastScan = studentScans[0];
+        const lastTime = new Date(lastScan.timestamp).toLocaleTimeString([], {
             hour: '2-digit',
             minute: '2-digit'
         });
@@ -3477,26 +3479,30 @@ function updateStudentDashboard(studentData) {
         }
         
         // Show latest first
-        studentScans.forEach(scan => {
-            const scanTime = new Date(scan.scanTime).toLocaleString();
-            
-            const scanItem = document.createElement('div');
-            scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left mb-3';
-            scanItem.innerHTML = `
-                <div class="flex justify-between items-start">
-                    <div>
-                        <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
-                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                            Teacher: <strong>${scan.teacherName || 'Unknown'}</strong>
-                        </p>
-                        ${scan.subject ? `<p class="text-xs text-gray-500 dark:text-gray-400">${scan.subject}</p>` : ''}
-                    </div>
-                    <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
-                        Present
-                    </span>
-                </div>
-            `;
-            historyContainer.appendChild(scanItem);
+        studentScans.slice().reverse().forEach(scan => {
+            try {
+                const data = JSON.parse(scan.data);
+                const scanTime = new Date(scan.timestamp).toLocaleString();
+                
+                // Sa updateStudentDashboard() function (hanapin sa dulo ng file):
+const scanItem = document.createElement('div');
+scanItem.className = 'bg-gray-50 dark:bg-gray-700 rounded-lg p-4 text-left';
+scanItem.innerHTML = `
+    <div class="flex justify-between items-start">
+        <div>
+            <p class="font-medium text-gray-800 dark:text-gray-200">${scanTime}</p>
+            <!-- I-UPDATE DITO: -->
+            <p class="text-sm text-gray-600 dark:text-gray-400">Teacher: ${data.scannedBy || 'Unknown'}</p>
+        </div>
+        <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
+            Present
+        </span>
+    </div>
+`;
+                historyContainer.appendChild(scanItem);
+            } catch (e) {
+                console.error('Error parsing scan data:', e);
+            }
         });
     }
 }
