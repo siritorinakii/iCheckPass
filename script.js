@@ -299,6 +299,7 @@ teacherPasswordInput.value.trim());
 }
 teacherNameInput.addEventListener("input", validateTeacherLogin);
 teacherPasswordInput.addEventListener("input", validateTeacherLogin);
+// In teacher login form submit handler, add auto-sync:
 teacherLoginFormStep.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -314,14 +315,16 @@ teacherLoginFormStep.addEventListener('submit', async (e) => {
     teacherLoginContinueBtn.disabled = true;
     teacherLoginContinueBtn.textContent = 'Logging in...';
     
-    // Use MockAPI for mobile
-    const result = MockAPI.login(username, password);
+    // Check credentials
+    const result = SimpleLogin.checkLogin(username, password);
     
     if (result.success) {
-        // Save teacher data
-        localStorage.setItem('teacherData', JSON.stringify(result.user));
+        // ✅ AUTO-SYNC ON LOGIN
+        setTimeout(() => {
+            CrossDeviceSync.autoSyncOnLogin(result.teacher.id);
+        }, 1000);
         
-        // Redirect to teacher bookmark
+        // Your existing redirect code...
         pageHistory.push(teacherBookmark);
         teacherLoginStep.classList.add('hidden');
         teacherBookmark.classList.remove('hidden');
@@ -329,8 +332,9 @@ teacherLoginFormStep.addEventListener('submit', async (e) => {
         
         // Show logout button
         document.getElementById('logoutBtn')?.classList.remove('hidden');
+        
     } else {
-        alert(result.message);
+        alert(result.message || 'Invalid login credentials');
     }
     
     // Reset button
@@ -761,8 +765,6 @@ div.innerHTML = `
             <div class="text-xs text-gray-500 dark:text-gray-500 mt-1">
                 ${info.strand || ''} ${info.section ? '• ' + info.section : ''}
             </div>
-            ${info.scannedBy ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-1"> ${info.scannedBy}</div>` : ''}
-        </div>
         <div class="text-right shrink-0">
             <div class="text-xs font-medium text-blue-600 dark:text-blue-400">${time}</div>
         </div>
@@ -847,8 +849,10 @@ if (code && code.data !== lastScannedCode) {
    // Sa scanQR() function, idagdag ito pagkatapos mag-save:
 // AFTER saving to scannedCodes, add:
 
-// Save to shared storage for student
-AttendanceSync.saveScanForStudent(studentInfo.number, {
+// Sa scanQR() function, palitan ang AttendanceSync.saveScanForStudent() ng:
+
+// Save to CROSS-DEVICE SERVER
+CrossDeviceSync.saveScanToServer({
     studentName: studentInfo.name,
     studentNumber: studentInfo.number,
     strand: studentInfo.strand,
@@ -858,10 +862,11 @@ AttendanceSync.saveScanForStudent(studentInfo.number, {
     scannedByUsername: studentInfo.scannedByUsername || '',
     timestamp: new Date().toISOString(),
     location: 'School',
-    type: 'QR Scan'
+    type: 'QR Scan',
+    teacherDevice: CrossDeviceSync.getDeviceId()
 });
 
-console.log(`Scan saved for student ${studentInfo.number}`);
+console.log(`✅ Scan saved to server for student ${studentInfo.number}`);
     
     // DAGDAGAN NG TEACHER NAME DITO:
     // Get current teacher
@@ -879,7 +884,6 @@ qrModalText.innerHTML = `
     <div class="text-center">
         <p class="text-2xl font-bold text-green-600">${studentInfo.name || 'Unknown Student'}</p>
         <p class="text-lg text-gray-700">${studentInfo.number || ''}</p>
-        ${studentInfo.scannedBy ? `<p class="text-sm text-blue-600 mt-1">Scanned by: <strong>${studentInfo.scannedBy}</strong></p>` : ''}
         <p class="text-sm text-green-500 font-bold mt-2">Attendance Recorded!</p>
     </div>
 `;
@@ -1593,7 +1597,6 @@ function skipToTeacherBookmark() {
         console.log(`Welcome back, ${teacher.fullName}!`);
     }
 }
-
 // Override teacher login form
 teacherLoginFormStep.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -2466,7 +2469,7 @@ function exportDashboardCSV() {
     }
     
     // CSV Headers - GRADE LEVEL FIXED
-    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Teacher\n';
+    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section\n';
     
     scannedCodes.forEach(scan => {
         try {
@@ -2481,7 +2484,6 @@ function exportDashboardCSV() {
             csv += `"${grade}",`;
             csv += `"${data.strand || ''}",`;
             csv += `"${data.section || ''}",`;
-            csv += `"${teacherName}"\n`;
         } catch (e) {
             csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
         }
@@ -3447,13 +3449,13 @@ if (studentDashboardBtn && studentDashboardSection) {
     updateStudentDashboardButton();
 }
 
-// Palitan ang buong updateStudentDashboard() function:
+// Palitan ang updateStudentDashboard() function:
 
 function updateStudentDashboard(studentData) {
     if (!studentDashboardSection || !studentData) return;
     
-    // GET FROM SHARED STORAGE (not from scannedCodes)
-    const studentAttendance = AttendanceSync.getStudentAttendance(studentData.number);
+    // ✅ GET FROM CROSS-DEVICE SERVER
+    const studentAttendance = CrossDeviceSync.getStudentScans(studentData.number);
     
     // Update stats
     document.getElementById('totalAttendance').textContent = studentAttendance.length;
@@ -3501,6 +3503,9 @@ function updateStudentDashboard(studentData) {
                         <p class="text-sm text-gray-600 dark:text-gray-400">Teacher: ${scan.scannedBy || 'Unknown'}</p>
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
                             ${scan.strand || ''} • ${scan.section || ''}
+                        </p>
+                        <p class="text-xs text-blue-500 dark:text-blue-400 mt-1">
+                            📍 ${scan.location || 'School'}
                         </p>
                     </div>
                     <span class="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">
@@ -3579,7 +3584,7 @@ function showNewScanNotification(scan) {
                 <div class="flex-1">
                     <h4 class="font-bold text-gray-800 dark:text-gray-100 text-sm mb-1">New Attendance Recorded!</h4>
                     <p class="text-gray-600 dark:text-gray-300 text-xs">
-                        Scanned by <strong>${scan.scannedBy || 'Teacher'}</strong>
+                        Scanned by <strong>${data.scannedBy || 'Teacher'}</strong>
                     </p>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-2">
                         ${new Date(scan.timestamp || scan.syncTime).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
@@ -3622,3 +3627,86 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// Sa student dashboard, mag-auto-check every 10 seconds
+let scanCheckInterval;
+
+function startScanMonitoring(studentNumber) {
+    if (scanCheckInterval) clearInterval(scanCheckInterval);
+    
+    scanCheckInterval = setInterval(() => {
+        if (!studentDashboardSection.classList.contains('hidden')) {
+            checkForNewScans(studentNumber);
+            updateStudentDashboard(JSON.parse(localStorage.getItem('studentQR')));
+        }
+    }, 10000); // Check every 10 seconds
+}
+
+// Add this after other dashboard button event listeners
+document.addEventListener('DOMContentLoaded', function() {
+    // Fix for sync button
+    const syncButton = document.getElementById('syncAllDevicesBtn');
+    if (syncButton) {
+        // Remove any existing listeners first
+        const newSyncButton = syncButton.cloneNode(true);
+        syncButton.parentNode.replaceChild(newSyncButton, syncButton);
+        
+        // Add new listener
+        document.getElementById('syncAllDevicesBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Check if teacher is logged in
+            const teacher = SimpleLogin.getCurrentTeacher();
+            if (!teacher) {
+                alert('Please login as teacher first!');
+                return;
+            }
+            
+            console.log('Sync button clicked for teacher:', teacher.id);
+            
+            // Call sync function
+            if (typeof CrossDeviceSync !== 'undefined') {
+                CrossDeviceSync.manualSync();
+            } else if (typeof SyncManager !== 'undefined') {
+                SyncManager.manualSync();
+            } else {
+                alert('Sync system not loaded. Please refresh the page.');
+            }
+        });
+    }
+    
+    // Also add global sync function for any button with onclick="sync()"
+    window.syncAllDevices = function() {
+        const teacher = SimpleLogin.getCurrentTeacher();
+        if (!teacher) {
+            alert('Please login as teacher first!');
+            return;
+        }
+        
+        if (typeof CrossDeviceSync !== 'undefined') {
+            CrossDeviceSync.manualSync();
+        } else {
+            alert('Sync system not available. Please refresh.');
+        }
+    };
+});
+
+// Also add periodic check for sync button
+setInterval(() => {
+    const syncBtn = document.getElementById('syncAllDevicesBtn');
+    if (syncBtn) {
+        // Make sure it has proper classes
+        if (!syncBtn.classList.contains('btn-primary')) {
+            syncBtn.classList.add('btn-primary');
+        }
+        
+        // Check if teacher is logged in to show/hide
+        const teacher = SimpleLogin.getCurrentTeacher();
+        if (teacher) {
+            syncBtn.style.display = 'flex';
+        } else {
+            syncBtn.style.display = 'none';
+        }
+    }
+}, 2000);

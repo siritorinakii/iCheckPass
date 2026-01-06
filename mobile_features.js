@@ -176,100 +176,174 @@ window.Server = new SimpleServer();
 // Instead of localStorage, use: Server.addScan(scanData)
 // Instead of filtering, use: Server.getStudentScans(studentNumber)
 
-// mobile_features.js - ADD THIS AT THE BOTTOM
+// mobile_features.js - ADD THIS AT THE END
 
 // ==============================================
-// CROSS-DEVICE ATTENDANCE SYNC
+// CROSS-DEVICE SYNC SIMULATION
 // ==============================================
 
-const AttendanceSync = {
-    // Key for shared attendance data
-    sharedKey: 'icheckpass_shared_attendance',
+const CrossDeviceSync = {
+    serverKey: 'icheckpass_server_simulation',
+    maxSyncAttempts: 3,
     
-    // Save scan to shared storage (para makita ng student)
-    saveScanForStudent(studentNumber, scanData) {
-        const sharedData = this.getSharedData();
-        
-        if (!sharedData[studentNumber]) {
-            sharedData[studentNumber] = [];
+    // Initialize server
+    initServer() {
+        if (!localStorage.getItem(this.serverKey)) {
+            localStorage.setItem(this.serverKey, JSON.stringify({
+                scans: [],
+                lastSync: new Date().toISOString(),
+                version: '1.0'
+            }));
         }
+        console.log('Cross-device sync server initialized');
+    },
+    
+    // Save scan to server (simulated)
+    saveScanToServer(scanData) {
+        const server = this.getServerData();
         
-        // Add scan to student's history
-        sharedData[studentNumber].unshift({
+        server.scans.unshift({
             ...scanData,
-            syncTime: new Date().toISOString()
+            deviceId: this.getDeviceId(),
+            syncTime: new Date().toISOString(),
+            syncId: Date.now() + '_' + Math.random().toString(36).substr(2, 9)
         });
         
-        // Keep only last 50 scans per student
-        if (sharedData[studentNumber].length > 50) {
-            sharedData[studentNumber].pop();
+        // Keep only last 1000 scans
+        if (server.scans.length > 1000) {
+            server.scans.pop();
         }
         
-        this.saveSharedData(sharedData);
+        server.lastSync = new Date().toISOString();
+        this.saveServerData(server);
+        
+        console.log('Scan saved to server simulation:', scanData.studentNumber);
         return true;
     },
     
-    // Get student's attendance history
-    getStudentAttendance(studentNumber) {
-        const sharedData = this.getSharedData();
-        return sharedData[studentNumber] || [];
+    // Get scans for specific student
+    getStudentScans(studentNumber) {
+        const server = this.getServerData();
+        return server.scans.filter(scan => 
+            scan.studentNumber === studentNumber
+        );
     },
     
-    // Get all shared data
-    getSharedData() {
+    // Get all scans (for debugging)
+    getAllScans() {
+        return this.getServerData().scans;
+    },
+    
+    // Get server data
+    getServerData() {
         try {
-            const data = localStorage.getItem(this.sharedKey);
-            return data ? JSON.parse(data) : {};
+            const data = localStorage.getItem(this.serverKey);
+            return data ? JSON.parse(data) : { scans: [], lastSync: null };
         } catch (e) {
-            return {};
+            return { scans: [], lastSync: null };
         }
     },
     
-    // Save shared data
-    saveSharedData(data) {
+    // Save server data
+    saveServerData(data) {
         try {
-            localStorage.setItem(this.sharedKey, JSON.stringify(data));
+            localStorage.setItem(this.serverKey, JSON.stringify(data));
             return true;
         } catch (e) {
-            console.error('Error saving shared data:', e);
+            console.error('Error saving server data:', e);
             return false;
         }
     },
     
-    // Clear old data (older than 30 days)
-    cleanupOldData() {
-        const sharedData = this.getSharedData();
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        Object.keys(sharedData).forEach(studentNumber => {
-            sharedData[studentNumber] = sharedData[studentNumber].filter(scan => {
-                const scanDate = new Date(scan.timestamp || scan.syncTime);
-                return scanDate > thirtyDaysAgo;
-            });
-            
-            if (sharedData[studentNumber].length === 0) {
-                delete sharedData[studentNumber];
-            }
-        });
-        
-        this.saveSharedData(sharedData);
+    // Generate unique device ID
+    getDeviceId() {
+        let deviceId = localStorage.getItem('device_id');
+        if (!deviceId) {
+            deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            localStorage.setItem('device_id', deviceId);
+        }
+        return deviceId;
     },
     
-    // Export student's data for backup
-    exportStudentData(studentNumber) {
-        const attendance = this.getStudentAttendance(studentNumber);
+    // Sync between tabs/windows (same browser)
+    setupTabSync() {
+        // Listen for storage events (cross-tab sync)
+        window.addEventListener('storage', (event) => {
+            if (event.key === this.serverKey) {
+                console.log('Data synced from another tab');
+                
+                // Update UI if student dashboard is open
+                const savedStudentQR = localStorage.getItem('studentQR');
+                if (savedStudentQR) {
+                    try {
+                        const studentData = JSON.parse(savedStudentQR);
+                        if (document.getElementById('studentDashboardSection') && 
+                            !document.getElementById('studentDashboardSection').classList.contains('hidden')) {
+                            updateStudentDashboard(studentData);
+                        }
+                    } catch (e) {}
+                }
+            }
+        });
+    },
+    
+    // Export server data (for backup)
+    exportServerData() {
+        const server = this.getServerData();
         return JSON.stringify({
-            studentNumber: studentNumber,
-            totalScans: attendance.length,
-            attendance: attendance,
-            exportDate: new Date().toISOString()
+            version: '1.0',
+            exportDate: new Date().toISOString(),
+            totalScans: server.scans.length,
+            scans: server.scans,
+            summary: {
+                uniqueStudents: [...new Set(server.scans.map(s => s.studentNumber))].length,
+                uniqueTeachers: [...new Set(server.scans.map(s => s.scannedBy))].length,
+                dateRange: server.scans.length > 0 ? {
+                    oldest: server.scans[server.scans.length - 1].syncTime,
+                    newest: server.scans[0].syncTime
+                } : null
+            }
         }, null, 2);
+    },
+    
+    // Import server data
+    importServerData(jsonData) {
+        try {
+            const data = JSON.parse(jsonData);
+            this.saveServerData({
+                scans: data.scans || [],
+                lastSync: new Date().toISOString(),
+                version: '1.0'
+            });
+            return { success: true, count: data.scans?.length || 0 };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
+    },
+    
+    // Cleanup old data (older than 60 days)
+    cleanupOldData() {
+        const server = this.getServerData();
+        const sixtyDaysAgo = new Date();
+        sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+        
+        const originalLength = server.scans.length;
+        server.scans = server.scans.filter(scan => {
+            const scanDate = new Date(scan.syncTime || scan.timestamp);
+            return scanDate > sixtyDaysAgo;
+        });
+        
+        if (server.scans.length < originalLength) {
+            this.saveServerData(server);
+            console.log(`Cleaned up ${originalLength - server.scans.length} old scans`);
+        }
     }
 };
 
-// Add to global scope
-window.AttendanceSync = AttendanceSync;
+// Initialize on load
+CrossDeviceSync.initServer();
+CrossDeviceSync.setupTabSync();
+CrossDeviceSync.cleanupOldData();
 
-// Cleanup old data on startup
-AttendanceSync.cleanupOldData();
+// Add to global scope
+window.CrossDeviceSync = CrossDeviceSync;
