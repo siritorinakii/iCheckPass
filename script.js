@@ -943,7 +943,7 @@ const sectionsCount = {
     "HUMSS": { 11: 3, 12: 4 },
     "GAS": { 11: 1, 12: 1 },
     "ICT": { 11: 1, 12: 2 },
-    "HRTCO": { 11: 3, 12: 3 }
+    "HRCTO": { 11: 3, 12: 3 }
 };
 
 function openModal(track) {
@@ -957,7 +957,7 @@ function openModal(track) {
     goToScannerBtn.disabled = true;
     goToScannerBtn.classList.add("bg-gray-300", "text-gray-600", "cursor-not-allowed");
 
-    const strands = track === "Academic Strand" ? ["STEM", "ABM", "HUMSS", "GAS"] : ["HRTCO", "ICT"];
+    const strands = track === "Academic Strand" ? ["STEM", "ABM", "HUMSS", "GAS"] : ["HRCTO", "ICT"];
     strands.forEach(s => {
         const btn = document.createElement("button");
         btn.className = "px-8 py-6 rounded-full border-4 border-blue-300 text-blue-700 font-bold text-xl hover:border-blue-600 transition-all";
