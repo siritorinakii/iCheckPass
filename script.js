@@ -299,7 +299,6 @@ teacherPasswordInput.value.trim());
 }
 teacherNameInput.addEventListener("input", validateTeacherLogin);
 teacherPasswordInput.addEventListener("input", validateTeacherLogin);
-// In teacher login form submit handler, add auto-sync:
 teacherLoginFormStep.addEventListener('submit', async (e) => {
     e.preventDefault();
     
@@ -315,16 +314,14 @@ teacherLoginFormStep.addEventListener('submit', async (e) => {
     teacherLoginContinueBtn.disabled = true;
     teacherLoginContinueBtn.textContent = 'Logging in...';
     
-    // Check credentials
-    const result = SimpleLogin.checkLogin(username, password);
+    // Use MockAPI for mobile
+    const result = MockAPI.login(username, password);
     
     if (result.success) {
-        // ✅ AUTO-SYNC ON LOGIN
-        setTimeout(() => {
-            CrossDeviceSync.autoSyncOnLogin(result.teacher.id);
-        }, 1000);
+        // Save teacher data
+        localStorage.setItem('teacherData', JSON.stringify(result.user));
         
-        // Your existing redirect code...
+        // Redirect to teacher bookmark
         pageHistory.push(teacherBookmark);
         teacherLoginStep.classList.add('hidden');
         teacherBookmark.classList.remove('hidden');
@@ -332,9 +329,8 @@ teacherLoginFormStep.addEventListener('submit', async (e) => {
         
         // Show logout button
         document.getElementById('logoutBtn')?.classList.remove('hidden');
-        
     } else {
-        alert(result.message || 'Invalid login credentials');
+        alert(result.message);
     }
     
     // Reset button
@@ -1597,6 +1593,7 @@ function skipToTeacherBookmark() {
         console.log(`Welcome back, ${teacher.fullName}!`);
     }
 }
+
 // Override teacher login form
 teacherLoginFormStep.addEventListener('submit', function(e) {
     e.preventDefault();
@@ -3641,72 +3638,3 @@ function startScanMonitoring(studentNumber) {
         }
     }, 10000); // Check every 10 seconds
 }
-
-// Add this after other dashboard button event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Fix for sync button
-    const syncButton = document.getElementById('syncAllDevicesBtn');
-    if (syncButton) {
-        // Remove any existing listeners first
-        const newSyncButton = syncButton.cloneNode(true);
-        syncButton.parentNode.replaceChild(newSyncButton, syncButton);
-        
-        // Add new listener
-        document.getElementById('syncAllDevicesBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Check if teacher is logged in
-            const teacher = SimpleLogin.getCurrentTeacher();
-            if (!teacher) {
-                alert('Please login as teacher first!');
-                return;
-            }
-            
-            console.log('Sync button clicked for teacher:', teacher.id);
-            
-            // Call sync function
-            if (typeof CrossDeviceSync !== 'undefined') {
-                CrossDeviceSync.manualSync();
-            } else if (typeof SyncManager !== 'undefined') {
-                SyncManager.manualSync();
-            } else {
-                alert('Sync system not loaded. Please refresh the page.');
-            }
-        });
-    }
-    
-    // Also add global sync function for any button with onclick="sync()"
-    window.syncAllDevices = function() {
-        const teacher = SimpleLogin.getCurrentTeacher();
-        if (!teacher) {
-            alert('Please login as teacher first!');
-            return;
-        }
-        
-        if (typeof CrossDeviceSync !== 'undefined') {
-            CrossDeviceSync.manualSync();
-        } else {
-            alert('Sync system not available. Please refresh.');
-        }
-    };
-});
-
-// Also add periodic check for sync button
-setInterval(() => {
-    const syncBtn = document.getElementById('syncAllDevicesBtn');
-    if (syncBtn) {
-        // Make sure it has proper classes
-        if (!syncBtn.classList.contains('btn-primary')) {
-            syncBtn.classList.add('btn-primary');
-        }
-        
-        // Check if teacher is logged in to show/hide
-        const teacher = SimpleLogin.getCurrentTeacher();
-        if (teacher) {
-            syncBtn.style.display = 'flex';
-        } else {
-            syncBtn.style.display = 'none';
-        }
-    }
-}, 2000);

@@ -73,11 +73,11 @@ const SIMPLE_TEACHERS = [
     },
     {
     id: 10,
-    username: "sir.reymark",
+    username: "maam.gloria",
     password: "icpmeyc2025",
-    fullName: "Reymark Dacillo",
+    fullName: "Gloria Sta Cruz",
     position: "ICP SHS Teacher",
-    welcomeMessage: "Welcome Sir Reymark! Ready to learn and have fun?"
+    welcomeMessage: "Welcome Ma'am Gloria! Ready to learn and have fun?"
     },
     {
     id: 11,
