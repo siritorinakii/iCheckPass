@@ -450,7 +450,7 @@
             <div id="tvlTrackCard" class="cursor-pointer bg-white rounded-3xl shadow-xl border-4 border-transparent hover:border-blue-600 transition-all p-12 text-center group">
                 <img src="tvltrack.jpg" alt="TVL" class="w-32 h-32 rounded-full mx-auto mb-6 object-cover shadow-lg group-hover:scale-110 transition"/>
                 <h3 class="text-4xl font-bold text-blue-700 mb-3">TVL Track</h3>
-                <p class="text-xl text-blue-600">HRTCO • ICT</p>
+                <p class="text-xl text-blue-600">HRCTO • ICT</p>
             </div>
         </div>
     </div>
@@ -655,14 +655,23 @@
 </div>
 
      <!-- If you want to use exact same as primary buttons -->
-<!-- Using btn-primary class for ALL buttons in light mode -->
+<!-- Dashboard Action Buttons with Sync Options -->
 <div class="flex flex-wrap gap-4 mt-8 justify-center">
     <button id="exportDashboardCSV" class="btn-primary dark:bg-green-700 dark:hover:bg-green-600">
-        Export to CSV
+        Export CSV
     </button>
     
     <button id="printDashboard" class="btn-primary">
         Print Report
+    </button>
+    
+    <!-- SYNC BUTTONS -->
+    <button id="exportSyncData" class="btn-primary dark:bg-yellow-700 dark:hover:bg-yellow-600">
+        Export Sync File
+    </button>
+    
+    <button id="importSyncData" class="btn-primary dark:bg-orange-700 dark:hover:bg-orange-600">
+        Import Sync File
     </button>
     
     <button id="backToScannerFromDashboard" class="btn-primary dark:bg-purple-700 dark:hover:bg-purple-600">
@@ -673,6 +682,8 @@
         Back to Classes
     </button>
 </div>
+
+<!-- Hidden file input for importing - MOVED OUTSIDE BUTTON CONTAINER -->
     </div>
 </section>
 

@@ -1463,3 +1463,78 @@ body {
 .dark #studentAttendanceHistory::-webkit-scrollbar-thumb {
     background-color: #3b82f6;
 }
+
+/* Sync Button Styles */
+#exportSyncData,
+#importSyncData {
+    position: relative;
+    overflow: hidden;
+}
+
+#exportSyncData::before,
+#importSyncData::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s;
+}
+
+#exportSyncData:hover::before,
+#importSyncData:hover::before {
+    left: 100%;
+}
+
+/* Import Confirmation Modal Styles */
+#importConfirmModal input[type="radio"] {
+    accent-color: #3b82f6;
+}
+
+#importConfirmModal label {
+    transition: all 0.2s ease;
+}
+
+#importConfirmModal label:has(input:checked) {
+    border-color: #3b82f6 !important;
+    background-color: rgba(59, 130, 246, 0.05);
+}
+
+.dark #importConfirmModal label:has(input:checked) {
+    background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* Sync Success Modal Animation */
+#syncSuccessModal {
+    animation: fadeIn 0.3s ease-out;
+}
+
+#syncSuccessModal > div {
+    animation: scaleIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Mobile Responsive for Sync Buttons */
+@media (max-width: 640px) {
+    #exportSyncData,
+    #importSyncData {
+        width: 100%;
+        margin-bottom: 0.5rem;
+    }
+    
+    #teacherDashboard .flex-wrap {
+        flex-direction: column;
+    }
+}

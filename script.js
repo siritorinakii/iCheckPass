@@ -3638,3 +3638,448 @@ function startScanMonitoring(studentNumber) {
         }
     }, 10000); // Check every 10 seconds
 }
+
+// ==============================================
+// MANUAL SYNC - EXPORT SCANNED DATA
+// ==============================================
+
+document.getElementById('exportSyncData')?.addEventListener('click', function() {
+    const teacher = SimpleLogin.getCurrentTeacher();
+    
+    if (!teacher) {
+        alert('Please login first!');
+        return;
+    }
+    
+    const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
+    
+    if (scannedCodes.length === 0) {
+        alert('No data to export. Scan some students first!');
+        return;
+    }
+    
+    // Create sync data package
+    const syncData = {
+        version: '1.0',
+        exportDate: new Date().toISOString(),
+        exportedBy: {
+            teacherId: teacher.id,
+            teacherName: teacher.fullName,
+            username: teacher.username
+        },
+        deviceId: CrossDeviceSync.getDeviceId(),
+        totalRecords: scannedCodes.length,
+        scannedStudents: scannedCodes.map(scan => {
+            try {
+                const studentData = JSON.parse(scan.data);
+                return {
+                    studentName: studentData.name,
+                    studentNumber: studentData.number,
+                    strand: studentData.strand,
+                    strandCategory: studentData.strandCategory,
+                    grade: studentData.grade,
+                    section: studentData.section,
+                    timestamp: scan.timestamp,
+                    scannedBy: teacher.fullName,
+                    scannedByUsername: teacher.username
+                };
+            } catch (e) {
+                return null;
+            }
+        }).filter(Boolean), // Remove null entries
+        summary: {
+            uniqueStudents: new Set(scannedCodes.map(s => {
+                try {
+                    return JSON.parse(s.data).number;
+                } catch { return null; }
+            }).filter(Boolean)).size,
+            dateRange: {
+                oldest: scannedCodes[scannedCodes.length - 1]?.timestamp,
+                newest: scannedCodes[0]?.timestamp
+            }
+        }
+    };
+    
+    // Convert to JSON
+    const jsonString = JSON.stringify(syncData, null, 2);
+    
+    // Create download
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `iCheckPass_Sync_${teacher.username}_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Show success modal
+    showSyncSuccessModal('export', scannedCodes.length);
+});
+
+// ==============================================
+// MANUAL SYNC - IMPORT SCANNED DATA (FIXED)
+// ==============================================
+
+document.getElementById('importSyncData')?.addEventListener('click', function() {
+    const teacher = SimpleLogin.getCurrentTeacher();
+    
+    if (!teacher) {
+        alert('Please login first!');
+        return;
+    }
+    
+    console.log('Import button clicked'); // Debug
+    
+    // Get or create file input
+    let fileInput = document.getElementById('syncFileInput');
+    
+    if (!fileInput) {
+        console.log('Creating new file input'); // Debug
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.id = 'syncFileInput';
+        fileInput.accept = '.json';
+        fileInput.style.display = 'none';
+        document.body.appendChild(fileInput);
+        
+        // Add event listener to the new input
+        fileInput.addEventListener('change', handleSyncFileImport);
+    }
+    
+    // Trigger click
+    console.log('Triggering file input click'); // Debug
+    fileInput.click();
+});
+
+// Separate function to handle file import
+function handleSyncFileImport(e) {
+    const file = e.target.files[0];
+    console.log('File selected:', file); // Debug
+    
+    if (!file) {
+        console.log('No file selected'); // Debug
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(event) {
+        try {
+            console.log('File loaded, parsing...'); // Debug
+            const syncData = JSON.parse(event.target.result);
+            
+            // Validate sync data
+            if (!syncData.version || !syncData.scannedStudents || !Array.isArray(syncData.scannedStudents)) {
+                throw new Error('Invalid sync file format');
+            }
+            
+            console.log('Valid sync data:', syncData); // Debug
+            
+            // Show import confirmation modal
+            showImportConfirmationModal(syncData);
+            
+        } catch (error) {
+            console.error('Error parsing file:', error); // Debug
+            alert('Error reading sync file: ' + error.message + '\n\nPlease make sure you selected a valid iCheckPass sync file.');
+        }
+        
+        // Reset file input
+        e.target.value = '';
+    };
+    
+    reader.onerror = function() {
+        console.error('Error reading file'); // Debug
+        alert('Failed to read the file. Please try again.');
+    };
+    
+    console.log('Starting file read...'); // Debug
+    reader.readAsText(file);
+}
+
+// Also add listener to existing file input if it exists
+document.getElementById('syncFileInput')?.addEventListener('change', handleSyncFileImport);
+
+// ==============================================
+// IMPORT CONFIRMATION MODAL
+// ==============================================
+
+function showImportConfirmationModal(syncData) {
+    const teacher = SimpleLogin.getCurrentTeacher();
+    const currentScans = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]').length;
+    
+    const modalHTML = `
+        <div id="importConfirmModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[99999] p-4">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl max-w-lg w-full p-6 shadow-2xl">
+                <!-- Header -->
+                <div class="flex items-center justify-between mb-6">
+                    <div class="flex items-center gap-3">
+                        <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100">Import Sync Data</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Review before importing</p>
+                        </div>
+                    </div>
+                    <button onclick="document.getElementById('importConfirmModal').remove()" 
+                            class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-2xl">
+                        ×
+                    </button>
+                </div>
+                
+                <!-- Sync File Info -->
+                <div class="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 mb-4">
+                    <p class="text-sm font-medium text-blue-700 dark:text-blue-300 mb-2">📁 Sync File Information</p>
+                    <div class="space-y-1 text-sm">
+                        <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Exported by:</span> ${syncData.exportedBy.teacherName}
+                        </p>
+                        <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Username:</span> ${syncData.exportedBy.username}
+                        </p>
+                        <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Export date:</span> ${new Date(syncData.exportDate).toLocaleString()}
+                        </p>
+                        <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Total records:</span> ${syncData.totalRecords}
+                        </p>
+                        <p class="text-gray-700 dark:text-gray-300">
+                            <span class="font-medium">Unique students:</span> ${syncData.summary.uniqueStudents}
+                        </p>
+                    </div>
+                </div>
+                
+                <!-- Current Data Warning -->
+                ${currentScans > 0 ? `
+                <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 mb-4 border border-yellow-200 dark:border-yellow-800">
+                    <div class="flex items-start gap-2">
+                        <svg class="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                        </svg>
+                        <div>
+                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">You have existing data</p>
+                            <p class="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
+                                You currently have ${currentScans} scanned records. Choose how to handle them:
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+                
+                <!-- Import Options -->
+                <div class="space-y-3 mb-6">
+                    <label class="flex items-start gap-3 p-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-blue-500 transition">
+                        <input type="radio" name="importMode" value="merge" checked class="mt-1">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-gray-100">🔄 Merge with existing data</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">Keep current scans and add imported ones</p>
+                        </div>
+                    </label>
+                    
+                    <label class="flex items-start gap-3 p-3 border-2 border-gray-200 dark:border-gray-700 rounded-lg cursor-pointer hover:border-red-500 transition">
+                        <input type="radio" name="importMode" value="replace" class="mt-1">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-gray-100">⚠️ Replace existing data</p>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">Delete current scans and use only imported data</p>
+                        </div>
+                    </label>
+                </div>
+                
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button onclick="document.getElementById('importConfirmModal').remove()" 
+                            class="flex-1 py-3 px-4 rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition">
+                        Cancel
+                    </button>
+                    <button onclick="proceedWithImport()" 
+                            class="flex-1 py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
+                        Import Data
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modalDiv = document.createElement('div');
+    modalDiv.innerHTML = modalHTML;
+    document.body.appendChild(modalDiv);
+    
+    // Store sync data temporarily
+    window.tempSyncData = syncData;
+}
+
+// ==============================================
+// PROCEED WITH IMPORT
+// ==============================================
+
+window.proceedWithImport = function() {
+    const syncData = window.tempSyncData;
+    if (!syncData) return;
+    
+    const importMode = document.querySelector('input[name="importMode"]:checked')?.value;
+    
+    if (!importMode) {
+        alert('Please select an import mode');
+        return;
+    }
+    
+    // Get current scans
+    let currentScans = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
+    
+    // Convert imported data to scannedQRCodes format
+    const importedScans = syncData.scannedStudents.map(student => ({
+        data: JSON.stringify({
+            name: student.studentName,
+            number: student.studentNumber,
+            strand: student.strand,
+            strandCategory: student.strandCategory,
+            grade: student.grade,
+            section: student.section,
+            scannedBy: student.scannedBy,
+            scannedByUsername: student.scannedByUsername
+        }),
+        timestamp: student.timestamp,
+        name: student.studentName
+    }));
+    
+    let finalScans;
+    
+    if (importMode === 'replace') {
+        // Replace mode - use only imported data
+        finalScans = importedScans;
+    } else {
+        // Merge mode - combine and remove duplicates
+        const mergedMap = new Map();
+        
+        // Add current scans first
+        currentScans.forEach(scan => {
+            const key = scan.data + scan.timestamp;
+            mergedMap.set(key, scan);
+        });
+        
+        // Add imported scans (will overwrite if same key)
+        importedScans.forEach(scan => {
+            const key = scan.data + scan.timestamp;
+            mergedMap.set(key, scan);
+        });
+        
+        finalScans = Array.from(mergedMap.values());
+        
+        // Sort by timestamp (newest first)
+        finalScans.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('scannedQRCodes', JSON.stringify(finalScans));
+    
+    // Also save to CrossDeviceSync server
+    finalScans.forEach(scan => {
+        try {
+            const studentData = JSON.parse(scan.data);
+            CrossDeviceSync.saveScanToServer({
+                studentName: studentData.name,
+                studentNumber: studentData.number,
+                strand: studentData.strand,
+                strandCategory: studentData.strandCategory,
+                grade: studentData.grade,
+                section: studentData.section,
+                scannedBy: studentData.scannedBy,
+                scannedByUsername: studentData.scannedByUsername,
+                timestamp: scan.timestamp
+            });
+        } catch (e) {
+            console.error('Error syncing to server:', e);
+        }
+    });
+    
+    // Close modal
+    document.getElementById('importConfirmModal').remove();
+    
+    // Show success modal
+    showSyncSuccessModal('import', importedScans.length, importMode);
+    
+    // Update dashboard
+    updateDashboard();
+    
+    // Clean up temp data
+    delete window.tempSyncData;
+};
+
+// ==============================================
+// SYNC SUCCESS MODAL
+// ==============================================
+
+function showSyncSuccessModal(type, count, mode = null) {
+    const isExport = type === 'export';
+    
+    const modalHTML = `
+        <div id="syncSuccessModal" class="fixed inset-0 bg-black/70 flex items-center justify-center z-[99999] p-4">
+            <div class="bg-white dark:bg-gray-900 rounded-2xl max-w-md w-full p-6 shadow-2xl">
+                <div class="text-center">
+                    <div class="w-16 h-16 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                        <svg class="w-8 h-8 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                    
+                    <h3 class="text-xl font-bold text-gray-800 dark:text-gray-100 mb-2">
+                        ${isExport ? '✅ Export Successful!' : '✅ Import Successful!'}
+                    </h3>
+                    
+                    <p class="text-gray-600 dark:text-gray-400 mb-4">
+                        ${isExport 
+                            ? `Successfully exported ${count} student records.` 
+                            : `Successfully ${mode === 'replace' ? 'replaced with' : 'imported'} ${count} student records.`
+                        }
+                    </p>
+                    
+                    ${isExport ? `
+                    <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4 text-left">
+                        <p class="text-sm text-blue-700 dark:text-blue-300 mb-2">📱 <strong>To restore on another device:</strong></p>
+                        <ol class="text-xs text-gray-700 dark:text-gray-300 space-y-1 list-decimal list-inside">
+                            <li>Copy the downloaded file to the other device</li>
+                            <li>Login as the same teacher</li>
+                            <li>Go to Teacher Dashboard</li>
+                            <li>Click "Import Sync File"</li>
+                            <li>Select the file you just saved</li>
+                        </ol>
+                    </div>
+                    ` : `
+                    <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 mb-4">
+                        <p class="text-sm text-blue-700 dark:text-blue-300">
+                            ${mode === 'replace' 
+                                ? '⚠️ Previous data has been replaced' 
+                                : '🔄 Data has been merged with existing records'
+                            }
+                        </p>
+                    </div>
+                    `}
+                    
+                    <button onclick="document.getElementById('syncSuccessModal').remove()" 
+                            class="w-full py-3 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
+                        ${isExport ? 'Done' : 'View Dashboard'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modalDiv = document.createElement('div');
+    modalDiv.innerHTML = modalHTML;
+    document.body.appendChild(modalDiv);
+    
+    // Auto-close after 8 seconds for export
+    if (isExport) {
+        setTimeout(() => {
+            const modal = document.getElementById('syncSuccessModal');
+            if (modal) modal.remove();
+        }, 8000);
+    }
+}
+
+// ==============================================
+// CONTINUE WITH EXISTING CODE BELOW
+// ==============================================
