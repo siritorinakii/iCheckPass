@@ -3860,7 +3860,7 @@ function showImportConfirmationModal(syncData) {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
                         </svg>
                         <div>
-                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">You have existing data</p>
+                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">⚠️ You have existing data</p>
                             <p class="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
                                 You currently have ${currentScans} scanned records. Choose how to handle them:
                             </p>
