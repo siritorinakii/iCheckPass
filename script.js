@@ -841,12 +841,41 @@ if (code && code.data !== lastScannedCode) {
     } catch (e) {
         studentInfo = { name: "Invalid QR Code", number: "N/A" };
     }
+    
+    // ✅ VALIDATE: Check if student's strand/section matches teacher's class
+    const currentClass = JSON.parse(localStorage.getItem('lastTeacherClass') || '{}');
+    const studentStrand = studentInfo.strand || '';
+    const studentSection = studentInfo.section || '';
+    const teacherStrand = currentClass.strand || teacherData.strand || '';
+    const teacherSection = currentClass.section || teacherData.section || '';
+    
+    // ❌ REJECT if strand OR section doesn't match
+    if (studentStrand !== teacherStrand || studentSection !== teacherSection) {
+        qrModalText.innerHTML = `
+            <div class="text-center">
+                <p class="text-2xl font-bold text-red-600">❌ Wrong Class!</p>
+                <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Student'}</p>
+                <p class="text-sm text-gray-600 mt-1">${studentInfo.number || ''}</p>
+                <div class="bg-red-50 rounded-lg p-3 mt-3 text-left">
+                    <p class="text-xs text-red-700 font-semibold mb-1">Expected:</p>
+                    <p class="text-xs text-red-600">${teacherStrand} • Section ${teacherSection}</p>
+                    <p class="text-xs text-red-700 font-semibold mt-2 mb-1">Got:</p>
+                    <p class="text-xs text-red-600">${studentStrand} • Section ${studentSection}</p>
+                </div>
+            </div>
+        `;
+        qrModal.classList.remove('hidden');
+        
+        setTimeout(() => {
+            qrModal.classList.add('hidden');
+            lastScannedCode = null;
+        }, 3000);
+        
+        return; // ❌ STOP HERE - don't save anything
+    }
    
-   // Sa scanQR() function, idagdag ito pagkatapos mag-save:
-// AFTER saving to scannedCodes, add:
-
-// Sa scanQR() function, palitan ang AttendanceSync.saveScanForStudent() ng:
-
+   // ✅ PASSED VALIDATION - Continue with save
+   
 // Save to CROSS-DEVICE SERVER
 CrossDeviceSync.saveScanToServer({
     studentName: studentInfo.name,
@@ -3860,7 +3889,7 @@ function showImportConfirmationModal(syncData) {
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.998-.833-2.732 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z"/>
                         </svg>
                         <div>
-                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">⚠️ You have existing data</p>
+                            <p class="text-sm font-medium text-yellow-800 dark:text-yellow-300">You have existing data</p>
                             <p class="text-xs text-yellow-700 dark:text-yellow-400 mt-1">
                                 You currently have ${currentScans} scanned records. Choose how to handle them:
                             </p>
