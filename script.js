@@ -831,7 +831,7 @@ ctx.drawImage(teacherVideo, 0, 0, canvas.width, canvas.height);
 overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 const code = jsQR(imageData.data, imageData.width, imageData.height);
-   // Hanapin ang linyang ito (around line 720-760):
+// HANAPIN AT PALITAN ANG LINES (around 720-800):
 if (code && code.data !== lastScannedCode) {
     lastScannedCode = code.data;
 
@@ -842,94 +842,143 @@ if (code && code.data !== lastScannedCode) {
         studentInfo = { name: "Invalid QR Code", number: "N/A" };
     }
     
-    // ✅ VALIDATE: Check if student's strand/section matches teacher's class
+    // ✅ VALIDATION: Check if student's strand/section matches teacher's class
     const currentClass = JSON.parse(localStorage.getItem('lastTeacherClass') || '{}');
+    
+    // Get student data
     const studentStrand = studentInfo.strand || '';
     const studentSection = studentInfo.section || '';
+    const studentGrade = studentInfo.grade || '';
+    
+    // Get teacher class data
     const teacherStrand = currentClass.strand || teacherData.strand || '';
     const teacherSection = currentClass.section || teacherData.section || '';
+    const teacherGrade = currentClass.grade || teacherData.grade || '';
     
-    // ❌ REJECT if strand OR section doesn't match
-    if (studentStrand !== teacherStrand || studentSection !== teacherSection) {
+    // Normalize section strings
+    const normalizeSection = (section) => {
+        if (!section) return '';
+        return section.toString()
+            .replace(/^Section\s*/i, '')
+            .trim();
+    };
+    
+    const studentSectionNormalized = normalizeSection(studentSection);
+    const teacherSectionNormalized = normalizeSection(teacherSection);
+    
+    // ✅ CHECK VALIDATION
+    let isValid = true;
+    let mismatchReason = '';
+    
+    // Check strand
+    if (studentStrand !== teacherStrand) {
+        isValid = false;
+        mismatchReason = `Strand mismatch`;
+    }
+    
+    // Check section
+    else if (studentSectionNormalized !== teacherSectionNormalized) {
+        isValid = false;
+        mismatchReason = `Section mismatch`;
+    }
+    
+    if (!isValid) {
         qrModalText.innerHTML = `
             <div class="text-center">
                 <p class="text-2xl font-bold text-red-600">❌ Wrong Class!</p>
                 <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Student'}</p>
                 <p class="text-sm text-gray-600 mt-1">${studentInfo.number || ''}</p>
-                <div class="bg-red-50 rounded-lg p-3 mt-3 text-left">
-                    <p class="text-xs text-red-700 font-semibold mb-1">Expected:</p>
-                    <p class="text-xs text-red-600">${teacherStrand} • Section ${teacherSection}</p>
-                    <p class="text-xs text-red-700 font-semibold mt-2 mb-1">Got:</p>
-                    <p class="text-xs text-red-600">${studentStrand} • Section ${studentSection}</p>
+                <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 mt-3 text-left">
+                    <p class="text-xs text-red-700 dark:text-red-300 font-semibold mb-1">Expected Class:</p>
+                    <p class="text-xs text-red-600 dark:text-red-400">${teacherStrand} • ${teacherSection} • ${teacherGrade}</p>
+                    <p class="text-xs text-red-700 dark:text-red-300 font-semibold mt-2 mb-1">Student's Class:</p>
+                    <p class="text-xs text-red-600 dark:text-red-400">${studentStrand} • ${studentSection} • ${studentGrade}</p>
+                    <p class="text-xs text-red-500 dark:text-red-400 mt-2 font-medium">${mismatchReason} - Attendance NOT recorded</p>
                 </div>
             </div>
         `;
         qrModal.classList.remove('hidden');
         
+        // Block this QR code for 5 seconds to prevent spamming
+        lastScannedCode = code.data;
         setTimeout(() => {
             qrModal.classList.add('hidden');
             lastScannedCode = null;
         }, 3000);
         
-        return; // ❌ STOP HERE - don't save anything
+        return; // ❌ STOP HERE - NO SAVING, NO ATTENDANCE
     }
-   
-   // ✅ PASSED VALIDATION - Continue with save
-   
-// Save to CROSS-DEVICE SERVER
-CrossDeviceSync.saveScanToServer({
-    studentName: studentInfo.name,
-    studentNumber: studentInfo.number,
-    strand: studentInfo.strand,
-    section: studentInfo.section,
-    grade: studentInfo.grade,
-    scannedBy: studentInfo.scannedBy || 'Unknown Teacher',
-    scannedByUsername: studentInfo.scannedByUsername || '',
-    timestamp: new Date().toISOString(),
-    location: 'School',
-    type: 'QR Scan',
-    teacherDevice: CrossDeviceSync.getDeviceId()
-});
-
-console.log(`✅ Scan saved to server for student ${studentInfo.number}`);
     
-    // DAGDAGAN NG TEACHER NAME DITO:
-    // Get current teacher
+    // ✅ PASSED VALIDATION - SAVE ATTENDANCE
+    // Get current teacher for attribution
     const teacher = SimpleLogin.getCurrentTeacher();
     if (teacher) {
         studentInfo.scannedBy = teacher.fullName || teacher.username;
         studentInfo.scannedByUsername = teacher.username;
+        studentInfo.scannedTime = new Date().toISOString();
+        studentInfo.location = 'School';
     }
     
-    // Save the updated data
-    const updatedQRData = JSON.stringify(studentInfo);
-
-// Success Modal with Teacher Name
-qrModalText.innerHTML = `
-    <div class="text-center">
-        <p class="text-2xl font-bold text-green-600">${studentInfo.name || 'Unknown Student'}</p>
-        <p class="text-lg text-gray-700">${studentInfo.number || ''}</p>
-        <p class="text-sm text-green-500 font-bold mt-2">Attendance Recorded!</p>
-    </div>
-`;
+    // Save to CROSS-DEVICE SERVER
+    CrossDeviceSync.saveScanToServer({
+        studentName: studentInfo.name,
+        studentNumber: studentInfo.number,
+        strand: studentInfo.strand,
+        section: studentInfo.section,
+        grade: studentInfo.grade,
+        scannedBy: studentInfo.scannedBy || 'Unknown Teacher',
+        scannedByUsername: studentInfo.scannedByUsername || '',
+        timestamp: new Date().toISOString(),
+        location: 'School',
+        type: 'QR Scan',
+        teacherDevice: CrossDeviceSync.getDeviceId(),
+        status: 'PRESENT' // ✅ ADDED STATUS
+    });
+    
+    console.log(`✅ Valid scan saved for student ${studentInfo.number}`);
+    
+    // Success Modal with Teacher Name
+    qrModalText.innerHTML = `
+        <div class="text-center">
+            <p class="text-2xl font-bold text-green-600">✓ Attendance Recorded!</p>
+            <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Unknown Student'}</p>
+            <p class="text-sm text-gray-600">${studentInfo.number || ''}</p>
+            <p class="text-sm text-green-500 font-bold mt-2">${studentInfo.strand || ''} • ${studentInfo.section || ''}</p>
+            <p class="text-xs text-gray-500 mt-1">Scanned by: ${studentInfo.scannedBy || 'Teacher'}</p>
+        </div>
+    `;
     qrModal.classList.remove('hidden');
-
-    // Saved locally (offline backup)
+    
+    // ✅ SAVE LOCALLY (offline backup) - ONLY IF VALID
     const timestamp = new Date().toLocaleString();
-    if (!scannedCodes.some(item => item.data === code.data)) {
+    const qrDataWithTeacher = JSON.stringify(studentInfo);
+    
+    // Check if already scanned (prevent duplicates in same session)
+    const isAlreadyScanned = scannedCodes.some(item => 
+        JSON.parse(item.data).number === studentInfo.number &&
+        new Date(item.timestamp).toDateString() === new Date().toDateString()
+    );
+    
+    if (!isAlreadyScanned) {
         scannedCodes.unshift({
-            data: code.data,
+            data: qrDataWithTeacher,
             timestamp: timestamp,
             name: studentInfo.name || 'Unknown'
         });
-        // Keep only last 10
-        if (scannedCodes.length > 10) scannedCodes.pop();
-
+        
+        // Keep only last 50 records
+        if (scannedCodes.length > 50) scannedCodes.pop();
+        
         localStorage.setItem('scannedQRCodes', JSON.stringify(scannedCodes));
         renderScannedCodes();
+        
+        // Update dashboard if open
+        if (!teacherDashboard.classList.contains('hidden')) {
+            updateDashboard();
+        }
     }
-
-    // Auto-hide after 2.5 seconds
+    
+    // Auto-hide modal after 2.5 seconds
     setTimeout(() => {
         qrModal.classList.add('hidden');
         lastScannedCode = null;
