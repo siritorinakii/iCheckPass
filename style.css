@@ -1240,6 +1240,32 @@ body {
     transform: translateY(0);
 }
 
+/* Dashboard Buttons - All Side by Side */
+#teacherDashboard .flex-wrap {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    justify-content: center;
+    overflow-x: auto;
+}
+
+#teacherDashboard .flex-wrap button {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+    #teacherDashboard .flex-wrap {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    #teacherDashboard .flex-wrap button {
+        flex: 1 1 45%;
+        min-width: 140px;
+    }
+}
+
 /* Add to style.css */
 .font-mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;

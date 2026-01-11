@@ -2494,6 +2494,9 @@ function exportDashboardCSV() {
         return;
     }
     
+    // Get current class info from teacher's last selection
+    const lastClassData = JSON.parse(localStorage.getItem('lastTeacherClass') || '{}');
+    
     // CSV Headers - GRADE LEVEL FIXED
     let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section\n';
     
@@ -2515,16 +2518,30 @@ function exportDashboardCSV() {
         }
     });
     
+    // Create filename based on class selection
+    let filename = 'attendance_';
+    
+    if (lastClassData.strand && lastClassData.grade && lastClassData.section) {
+        // Extract grade number (11 or 12) from "Grade 11" or "Grade 12"
+        const gradeNum = lastClassData.grade.replace('Grade ', '');
+        
+        // Format: STEM_12_Section_1_2025-01-10.csv
+        filename = `${lastClassData.strand}_${gradeNum}_${lastClassData.section}_${new Date().toISOString().slice(0,10)}.csv`;
+    } else {
+        // Fallback to date-only filename
+        filename = `attendance_${new Date().toISOString().slice(0,10)}.csv`;
+    }
+    
     // Create and download CSV
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `attendance_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
     
-    alert(`Exported ${scannedCodes.length} records to CSV (including Grade)`);
+    alert(`Exported ${scannedCodes.length} records to CSV\nFilename: ${filename}`);
 }
 
 // Print Dashboard
