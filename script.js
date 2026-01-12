@@ -390,6 +390,7 @@ teacherAttendanceForm.addEventListener('input', () => {
 const allFilled = lateTime.value && absentTime.value;
 teacherAttendanceForm.querySelector('button[type="submit"]').disabled = !allFilled;
 });
+// Update the teacher attendance form submission
 teacherAttendanceForm.addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -401,13 +402,8 @@ teacherAttendanceForm.addEventListener('submit', function(e) {
         teacherData.name = "Teacher";
     }
     
-    if (teacherData.grade) {
-    
-        
-    } else {
-        teacherData.grade = "Grade 11";
-    }
-    
+    teacherData.lateTime = lateTime.value; // Store just the time value
+    teacherData.absentTime = absentTime.value; // Store just the time value
     teacherData.late = "Late: " + lateTime.value;
     teacherData.absent = "Absent: " + absentTime.value;
     
@@ -416,26 +412,28 @@ teacherAttendanceForm.addEventListener('submit', function(e) {
     teacherAttendanceStep.classList.add('hidden');
     
     // Update confirmation display
-    confirmTeacherName.textContent = "Name: " + teacherData.name;
+    confirmTeacherName.textContent = "Teacher: " + teacherData.name;
     confirmTeacherSection.textContent = "Section: " + teacherData.section;
     confirmTeacherSchedule.textContent = "Schedule: " + teacherData.schedule;
     confirmTeacherDateTime.textContent = "Date: " + teacherData.date;
     
-    // Add grade to confirmation
-    let gradeDisplay = document.getElementById('confirmTeacherGrade');
-    if (!gradeDisplay) {
-        gradeDisplay = document.createElement('p');
-        gradeDisplay.id = 'confirmTeacherGrade';
-        gradeDisplay.className = 'text-blue-700 dark:text-blue-300';
-        
-        // Insert in correct order
-        const sectionElement = document.getElementById('confirmTeacherSection');
-        if (sectionElement && sectionElement.parentNode) {
-            // Insert after section
-            sectionElement.parentNode.insertBefore(gradeDisplay, sectionElement.nextSibling);
-        }
+    // Add attendance rules
+    const attendanceRules = document.createElement('div');
+    attendanceRules.className = 'mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg';
+    attendanceRules.innerHTML = `
+        <p class="text-sm font-semibold text-yellow-700 dark:text-yellow-300">📋 Attendance Rules Applied:</p>
+        <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
+            • Present: Before ${teacherData.lateTime}<br>
+            • Late: ${teacherData.lateTime} to ${teacherData.absentTime}<br>
+            • Absent: After ${teacherData.absentTime}
+        </p>
+    `;
+    
+    // Find where to insert (after confirmation box or before button)
+    const confirmBox = document.querySelector('#teacherConfirmStep .bg-blue-50');
+    if (confirmBox) {
+        confirmBox.parentNode.insertBefore(attendanceRules, confirmBox.nextSibling);
     }
-    gradeDisplay.textContent = "Grade: " + teacherData.grade;
     
     confirmAttendanceMarks.textContent = teacherData.late + " | " + teacherData.absent;
     
@@ -444,6 +442,13 @@ teacherAttendanceForm.addEventListener('submit', function(e) {
     teacherConfirmBtn.classList.remove('btn-disabled');
     teacherConfirmBtn.classList.add('btn-primary');
     updateBackButton();
+    
+    // Save to localStorage for later use
+    localStorage.setItem('currentAttendanceRules', JSON.stringify({
+        lateTime: teacherData.lateTime,
+        absentTime: teacherData.absentTime,
+        scheduleStart: teacherData.schedule.split(' - ')[0]
+    }));
 });
 // Report a problem Flow
 const troubleSection = document.getElementById("troubleSection");
@@ -882,6 +887,9 @@ function scanQR() {
                 }
                 
                 // ✅ VALIDATION LOGIC (same as before)
+                
+                
+                
                 const currentClass = JSON.parse(localStorage.getItem('lastTeacherClass') || '{}');
                 
                 const studentStrand = studentInfo.strand || '';
@@ -922,22 +930,91 @@ else if (studentGrade && teacherGrade && studentGrade !== teacherGrade) {
     mismatchReason = `Grade mismatch`;
 }
 
+if (isValid) {
+    const teacher = SimpleLogin.getCurrentTeacher();
+    if (teacher) {
+        studentInfo.scannedBy = teacher.fullName || teacher.username;
+        studentInfo.scannedByUsername = teacher.username;
+        studentInfo.scannedTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+        studentInfo.scanDateTime = new Date().toISOString();
+        studentInfo.location = 'School';
+        
+    // Add this right after studentInfo is parsed (around line 690):
+if (teacherData.scheduleStart && teacherData.lateTime && teacherData.absentTime) {
+    // Calculate attendance status based on scan time
+    const scanTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    
+    // Helper function to compare times
+    const isAfterTime = (time1, time2) => {
+        const [h1, m1] = time1.split(':').map(Number);
+        const [h2, m2] = time2.split(':').map(Number);
+        return (h1 > h2) || (h1 === h2 && m1 > m2);
+    };
+    
+    // Determine status
+    if (isAfterTime(scanTime, teacherData.absentTime)) {
+        studentInfo.attendanceStatus = 'ABSENT';
+    } else if (isAfterTime(scanTime, teacherData.lateTime)) {
+        studentInfo.attendanceStatus = 'LATE';
+    } else {
+        studentInfo.attendanceStatus = 'PRESENT';
+    }
+} else {
+    studentInfo.attendanceStatus = 'PRESENT'; // Default if no times set
+}
+    }
+    
+// Success Modal with Attendance Status
+                const statusColors = {
+                    'PRESENT': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300', icon: '✓' },
+                    'LATE': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', icon: '⚠' },
+                    'ABSENT': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: '✕' }
+                };
+                
+                const status = studentInfo.attendanceStatus || 'PRESENT';
+                const statusStyle = statusColors[status];
+                
+                qrModalText.innerHTML = `
+                    <div class="text-center">
+                        <p class="text-2xl font-bold text-green-600">✓ Attendance Recorded!</p>
+                        <p class="text-lg text-gray-700 dark:text-gray-200 mt-2">${studentInfo.name || 'Unknown Student'}</p>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">${studentInfo.number || ''}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">${studentInfo.strand || ''} • ${studentInfo.section || ''}</p>
+                        
+                        <!-- Attendance Status Badge -->
+                        <div class="mt-4 flex items-center justify-center">
+                            <div class="px-4 py-2 ${statusStyle.bg} ${statusStyle.text} rounded-lg font-bold text-lg flex items-center gap-2">
+                                <span>${statusStyle.icon}</span>
+                                <span>${status}</span>
+                            </div>
+                        </div>
+                        
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
+                            Scanned: ${studentInfo.scannedTime || new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                        </p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">
+                            By: ${studentInfo.scannedBy || 'Teacher'}
+                        </p>
+                    </div>
+                `;
+}
+
 if (!isValid) {
-    // Show error modal
-    qrModalText.innerHTML = `
-        <div class="text-center">
-            <p class="text-2xl font-bold text-red-600">❌ Wrong Class!</p>
-            <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Student'}</p>
-            <p class="text-sm text-gray-600 mt-1">${studentInfo.number || ''}</p>
-            <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 mt-3 text-left">
-                <p class="text-xs text-red-700 dark:text-red-300 font-semibold mb-1">Expected Class:</p>
-                <p class="text-xs text-red-600 dark:text-red-400">${teacherStrand} • ${teacherSection} • ${teacherGrade}</p>
-                <p class="text-xs text-red-700 dark:text-red-300 font-semibold mt-2 mb-1">Student's Class:</p>
-                <p class="text-xs text-red-600 dark:text-red-400">${studentStrand} • ${studentSection} • ${studentGrade}</p>
-                <p class="text-xs text-red-500 dark:text-red-400 mt-2 font-medium">${mismatchReason} - Attendance NOT recorded</p>
-            </div>
+// Update it to also show attendance status for wrong class:
+qrModalText.innerHTML = `
+    <div class="text-center">
+        <p class="text-2xl font-bold text-red-600">❌ Wrong Class!</p>
+        <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Student'}</p>
+        <p class="text-sm text-gray-600 mt-1">${studentInfo.number || ''}</p>
+        <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 mt-3 text-left">
+            <p class="text-xs text-red-700 dark:text-red-300 font-semibold mb-1">Expected Class:</p>
+            <p class="text-xs text-red-600 dark:text-red-400">${teacherStrand} • ${teacherSection} • ${teacherGrade}</p>
+            <p class="text-xs text-red-700 dark:text-red-300 font-semibold mt-2 mb-1">Student's Class:</p>
+            <p class="text-xs text-red-600 dark:text-red-400">${studentStrand} • ${studentSection} • ${studentGrade}</p>
+            <p class="text-xs text-red-500 dark:text-red-400 mt-2 font-medium">${mismatchReason} - Attendance NOT recorded</p>
         </div>
-    `;
+    </div>
+`;
     qrModal.classList.remove('hidden');
     
     // 🔥 CRITICAL FIX: Use setTimeout to reset immediately
@@ -961,32 +1038,7 @@ if (!isValid) {
                     studentInfo.location = 'School';
                 }
                 
-                // Save to server
-                CrossDeviceSync.saveScanToServer({
-                    studentName: studentInfo.name,
-                    studentNumber: studentInfo.number,
-                    strand: studentInfo.strand,
-                    section: studentInfo.section,
-                    grade: studentInfo.grade,
-                    scannedBy: studentInfo.scannedBy || 'Unknown Teacher',
-                    scannedByUsername: studentInfo.scannedByUsername || '',
-                    timestamp: new Date().toISOString(),
-                    location: 'School',
-                    type: 'QR Scan',
-                    teacherDevice: CrossDeviceSync.getDeviceId(),
-                    status: 'PRESENT'
-                });
-                
-                // Success Modal
-                qrModalText.innerHTML = `
-                    <div class="text-center">
-                        <p class="text-2xl font-bold text-green-600">✓ Attendance Recorded!</p>
-                        <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Unknown Student'}</p>
-                        <p class="text-sm text-gray-600">${studentInfo.number || ''}</p>
-                        <p class="text-sm text-green-500 font-bold mt-2">${studentInfo.strand || ''} • ${studentInfo.section || ''}</p>
-                        <p class="text-xs text-gray-500 mt-1">Scanned by: ${studentInfo.scannedBy || 'Teacher'}</p>
-                    </div>
-                `;
+
                 qrModal.classList.remove('hidden');
                 
                 // Save locally
@@ -2173,7 +2225,7 @@ const uniqueStudentsElement = document.getElementById('uniqueStudents');
 const lastScanTimeElement = document.getElementById('lastScanTime');
 const filterDateElement = document.getElementById('filterDate');
 const refreshDashboardBtn = document.getElementById('refreshDashboard');
-const exportDashboardCSVBtn = document.getElementById('exportDashboardCSV');
+const exportDashboardCSVBtn = document.getElementById('exportDashboardCSV')?.addEventListener('click', exportDashboardCSV);
 const printDashboardBtn = document.getElementById('printDashboard');
 const backToScannerFromDashboardBtn = document.getElementById('backToScannerFromDashboard');
 const backToBookmarkFromDashboardBtn = document.getElementById('backToBookmarkFromDashboard');
@@ -2573,28 +2625,46 @@ function deleteScan(qrData) {
     }
 }
 
-// FIXED VERSION - replace lines ~1990-2005
 function exportDashboardCSV() {
     const scannedCodes = JSON.parse(localStorage.getItem('scannedQRCodes') || '[]');
     const teacher = SimpleLogin.getCurrentTeacher();
+    const teacherName = teacher ? teacher.fullName : localStorage.getItem('teacher_name') || 'Unknown Teacher';
     
     if (scannedCodes.length === 0) {
         alert('No data to export!');
         return;
     }
     
-    // Get current class info from teacher's last selection
+    // Get current class info
     const lastClassData = JSON.parse(localStorage.getItem('lastTeacherClass') || '{}');
+    const teacherData = JSON.parse(localStorage.getItem('teacherData') || '{}');
     
-    // CSV Headers - GRADE LEVEL FIXED
-    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section\n';
+    // Sort alphabetically by student name
+    const sortedScans = scannedCodes.slice().sort((a, b) => {
+        try {
+            const nameA = JSON.parse(a.data).name?.toLowerCase() || '';
+            const nameB = JSON.parse(b.data).name?.toLowerCase() || '';
+            return nameA.localeCompare(nameB);
+        } catch (e) {
+            return 0;
+        }
+    });
     
-    scannedCodes.forEach(scan => {
+    // CSV Headers - REMOVED "Scanned By" column
+    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Attendance Status,Teacher,Class Schedule\n';
+    
+    sortedScans.forEach(scan => {
         try {
             const data = JSON.parse(scan.data);
-            const teacherName = teacher ? teacher.fullName : localStorage.getItem('teacher_name') || 'Unknown';
             
-            const grade = data.grade  || 'N/A';
+            // Extract grade properly
+            const grade = data.grade || (data.gradeLevel ? `Grade ${data.gradeLevel}` : 'N/A');
+            
+            // Get attendance status
+            const status = data.attendanceStatus || 'PRESENT';
+            
+            // Get class schedule if available
+            const classSchedule = data.classSchedule || teacherData.schedule || '';
             
             csv += `"${scan.timestamp}",`;
             csv += `"${data.name || ''}",`;
@@ -2602,23 +2672,23 @@ function exportDashboardCSV() {
             csv += `"${grade}",`;
             csv += `"${data.strand || ''}",`;
             csv += `"${data.section || ''}",`;
+            csv += `"${status}",`;
+            csv += `"${teacherName}",`; // Teacher column
+            csv += `"${classSchedule}"\n`;
         } catch (e) {
-            csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","${teacher ? teacher.fullName : 'Unknown'}"\n`;
+            csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","ERROR","${teacherName}",""\n`;
         }
     });
     
-    // Create filename based on class selection
-    let filename = 'attendance_';
+    // Create filename with teacher name
+    let filename = '';
+    const safeTeacherName = teacherName.replace(/[^a-zA-Z0-9]/g, '_');
     
     if (lastClassData.strand && lastClassData.grade && lastClassData.section) {
-        // Extract grade number (11 or 12) from "Grade 11" or "Grade 12"
         const gradeNum = lastClassData.grade.replace('Grade ', '');
-        
-        // Format: STEM_12_Section_1_2025-01-10.csv
-        filename = `${lastClassData.strand}_${gradeNum}_${lastClassData.section}_${new Date().toISOString().slice(0,10)}.csv`;
+        filename = `${safeTeacherName}_${lastClassData.strand}_${gradeNum}_${lastClassData.section}_${new Date().toISOString().slice(0,10)}.csv`;
     } else {
-        // Fallback to date-only filename
-        filename = `attendance_${new Date().toISOString().slice(0,10)}.csv`;
+        filename = `${safeTeacherName}_attendance_${new Date().toISOString().slice(0,10)}.csv`;
     }
     
     // Create and download CSV
@@ -2627,10 +2697,61 @@ function exportDashboardCSV() {
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
     URL.revokeObjectURL(url);
+
+function showExportSuccessModal() {
+    const modalHTML = `
+        <div id="exportSuccessModal" class="fixed inset-0 bg-black/50 flex items-center justify-center z-[99999] p-4">
+            <div class="bg-white dark:bg-gray-900 rounded-xl p-6 max-w-sm w-full shadow-xl">
+                <!-- Success Icon -->
+                <div class="flex justify-center mb-4">
+                    <div class="w-12 h-12 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                    </div>
+                </div>
+                
+                <!-- Message -->
+                <div class="text-center mb-6">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">
+                        Exported Successfully!
+                    </h3>
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        CSV file has been downloaded
+                    </p>
+                </div>
+                
+                <!-- OK Button -->
+                <div class="text-center">
+                    <button onclick="document.getElementById('exportSuccessModal').remove()" 
+                            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition">
+                        OK
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
     
-    alert(`Exported ${scannedCodes.length} records to CSV\nFilename: ${filename}`);
+    const modalDiv = document.createElement('div');
+    modalDiv.innerHTML = modalHTML;
+    document.body.appendChild(modalDiv);
+    
+    // Auto-close after 3 seconds
+    setTimeout(() => {
+        if (modalDiv.parentNode) {
+            modalDiv.remove();
+        }
+    }, 3000);
+}
+
+// Then in your exportDashboardCSV function, replace:
+// alert("Exported Successfully!");
+// With:
+showExportSuccessModal();
 }
 
 // Print Dashboard
@@ -4246,3 +4367,48 @@ function stopCamera() {
     startScannerBtn.disabled = false;
     qrModal.style.display = 'none';
 }
+
+// Add this function to handle attendance marking
+function markAttendanceBasedOnTime(studentScanTime, scheduleStart, lateTime, absentTime) {
+    const scanTime = new Date(`1970-01-01T${studentScanTime}`);
+    const scheduleTime = new Date(`1970-01-01T${scheduleStart}`);
+    const lateMarkTime = new Date(`1970-01-01T${lateTime}`);
+    const absentMarkTime = new Date(`1970-01-01T${absentTime}`);
+    
+    if (scanTime > absentMarkTime) {
+        return 'ABSENT';
+    } else if (scanTime > lateMarkTime) {
+        return 'LATE';
+    } else {
+        return 'PRESENT';
+    }
+}
+
+// Add this function to apply attendance rules during scanning
+function applyAttendanceRules(studentInfo) {
+    const rules = JSON.parse(localStorage.getItem('currentAttendanceRules') || '{}');
+    
+    if (!rules.lateTime || !rules.absentTime || !rules.scheduleStart) {
+        return 'PRESENT'; // Default if no rules set
+    }
+    
+    const currentTime = new Date();
+    const scanTimeStr = currentTime.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    
+    // Create date objects for comparison
+    const scanTime = new Date(`1970-01-01T${scanTimeStr}:00`);
+    const lateTime = new Date(`1970-01-01T${rules.lateTime}:00`);
+    const absentTime = new Date(`1970-01-01T${rules.absentTime}:00`);
+    
+    if (scanTime > absentTime) {
+        return 'ABSENT';
+    } else if (scanTime > lateTime) {
+        return 'LATE';
+    } else {
+        return 'PRESENT';
+    }
+}
+
+// Then in your scanQR function, when saving the scan:
+const attendanceStatus = applyAttendanceRules(studentInfo);
+studentInfo.attendanceStatus = attendanceStatus;
