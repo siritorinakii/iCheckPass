@@ -845,6 +845,56 @@ setTimeout(() => {
     resetScannerForNextQR(); // Call the reset function
 }, 800);
 
+// ============================================
+// 12-HOUR FORMAT WITH CORRECT TIME COMPARISON
+// ============================================
+
+// Convert time string to 24-hour format for comparison
+function convertTo24Hour(timeStr) {
+    if (!timeStr) return null;
+    
+    // If it's already in 24-hour format (HH:MM), convert it
+    const [time, period] = timeStr.match(/(\d{1,2}:\d{2})\s*(AM|PM|am|pm)?/) ? 
+        [timeStr.match(/\d{1,2}:\d{2}/)[0], timeStr.match(/AM|PM|am|pm/)?.[0]] : 
+        [timeStr, null];
+    
+    let [hours, minutes] = time.split(':').map(Number);
+    
+    if (period) {
+        const isPM = /PM|pm/.test(period);
+        if (isPM && hours !== 12) {
+            hours += 12;
+        } else if (!isPM && hours === 12) {
+            hours = 0;
+        }
+    }
+    
+    return String(hours).padStart(2, '0') + ':' + String(minutes).padStart(2, '0');
+}
+
+// Get current time in 12-hour format
+function getFormattedTime12Hour() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    
+    return `${displayHours}:${minutes} ${ampm}`;
+}
+
+// Get current time in 24-hour format (for comparison only)
+function getFormattedTime24Hour() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+}
+
+// ============================================
+// REPLACE THE ENTIRE scanQR FUNCTION WITH THIS:
+// ============================================
+
 function scanQR() {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
@@ -852,12 +902,10 @@ function scanQR() {
     function loop() {
         if (!scanning) return;
         
-        // 🔥 FIX: Reset lastScannedCode if modal is not visible
+        // Reset lastScannedCode if modal is not visible
         if (qrModal.classList.contains('hidden')) {
             lastScannedCode = null;
         }
-        
-        // Rest of your existing code...
         
         if (teacherVideo.readyState === teacherVideo.HAVE_ENOUGH_DATA) {
             canvas.width = teacherVideo.videoWidth;
@@ -868,12 +916,10 @@ function scanQR() {
             const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const code = jsQR(imageData.data, imageData.width, canvas.height);
             
-            // 🔥 FIX 1: Check if QR detected AND it's a new code (or same code after 2 seconds)
             const now = Date.now();
             const timeSinceLastScan = lastScannedCode ? now - lastScannedCode.timestamp : Infinity;
             
             if (code && (!lastScannedCode || code.data !== lastScannedCode.data || timeSinceLastScan > 2000)) {
-                // 🔥 FIX 2: Store code with timestamp
                 lastScannedCode = {
                     data: code.data,
                     timestamp: now
@@ -886,11 +932,9 @@ function scanQR() {
                     studentInfo = { name: "Invalid QR Code", number: "N/A" };
                 }
                 
-                // ✅ VALIDATION LOGIC (same as before)
-                
-                
-                
+                // Get current class info
                 const currentClass = JSON.parse(localStorage.getItem('lastTeacherClass') || '{}');
+                const attendanceRules = JSON.parse(localStorage.getItem('currentAttendanceRules') || '{}');
                 
                 const studentStrand = studentInfo.strand || '';
                 const studentSection = studentInfo.section || '';
@@ -910,69 +954,99 @@ function scanQR() {
                 const studentSectionNormalized = normalizeSection(studentSection);
                 const teacherSectionNormalized = normalizeSection(teacherSection);
                 
-                // ✅ CHECK VALIDATION - FIXED VERSION
-let isValid = true;
-let mismatchReason = '';
-
-// Check strand
-if (studentStrand !== teacherStrand) {
-    isValid = false;
-    mismatchReason = `Strand mismatch`;
-}
-// Check section
-else if (studentSectionNormalized !== teacherSectionNormalized) {
-    isValid = false;
-    mismatchReason = `Section mismatch`;
-}
-// Check grade if available
-else if (studentGrade && teacherGrade && studentGrade !== teacherGrade) {
-    isValid = false;
-    mismatchReason = `Grade mismatch`;
-}
-
-if (isValid) {
-    const teacher = SimpleLogin.getCurrentTeacher();
-    if (teacher) {
-        studentInfo.scannedBy = teacher.fullName || teacher.username;
-        studentInfo.scannedByUsername = teacher.username;
-        studentInfo.scannedTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-        studentInfo.scanDateTime = new Date().toISOString();
-        studentInfo.location = 'School';
-        
-    // Add this right after studentInfo is parsed (around line 690):
-if (teacherData.scheduleStart && teacherData.lateTime && teacherData.absentTime) {
-    // Calculate attendance status based on scan time
-    const scanTime = new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-    
-    // Helper function to compare times
-    const isAfterTime = (time1, time2) => {
-        const [h1, m1] = time1.split(':').map(Number);
-        const [h2, m2] = time2.split(':').map(Number);
-        return (h1 > h2) || (h1 === h2 && m1 > m2);
-    };
-    
-    // Determine status
-    if (isAfterTime(scanTime, teacherData.absentTime)) {
-        studentInfo.attendanceStatus = 'ABSENT';
-    } else if (isAfterTime(scanTime, teacherData.lateTime)) {
-        studentInfo.attendanceStatus = 'LATE';
-    } else {
-        studentInfo.attendanceStatus = 'PRESENT';
-    }
-} else {
-    studentInfo.attendanceStatus = 'PRESENT'; // Default if no times set
-}
-    }
-    
-// Success Modal with Attendance Status
+                // Validation
+                let isValid = true;
+                let mismatchReason = '';
+                
+                if (studentStrand !== teacherStrand) {
+                    isValid = false;
+                    mismatchReason = `Strand mismatch`;
+                } else if (studentSectionNormalized !== teacherSectionNormalized) {
+                    isValid = false;
+                    mismatchReason = `Section mismatch`;
+                } else if (studentGrade && teacherGrade && studentGrade !== teacherGrade) {
+                    isValid = false;
+                    mismatchReason = `Grade mismatch`;
+                }
+                
+                if (!isValid) {
+                    // Show error modal
+                    qrModalText.innerHTML = `
+                        <div class="text-center">
+                            <p class="text-2xl font-bold text-red-600">❌ Wrong Class!</p>
+                            <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Student'}</p>
+                            <p class="text-sm text-gray-600 mt-1">${studentInfo.number || ''}</p>
+                            <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 mt-3 text-left">
+                                <p class="text-xs text-red-700 dark:text-red-300 font-semibold mb-1">Expected Class:</p>
+                                <p class="text-xs text-red-600 dark:text-red-400">${teacherStrand} • ${teacherSection} • ${teacherGrade}</p>
+                                <p class="text-xs text-red-700 dark:text-red-300 font-semibold mt-2 mb-1">Student's Class:</p>
+                                <p class="text-xs text-red-600 dark:text-red-400">${studentStrand} • ${studentSection} • ${studentGrade}</p>
+                                <p class="text-xs text-red-500 dark:text-red-400 mt-2 font-medium">${mismatchReason} - Attendance NOT recorded</p>
+                            </div>
+                        </div>
+                    `;
+                    
+                    qrModal.classList.remove('hidden');
+                    
+                    setTimeout(() => {
+                        qrModal.classList.add('hidden');
+                        lastScannedCode = null;
+                    }, 800);
+                    
+                    requestAnimationFrame(loop);
+                    return;
+                }
+                
+                // ✅ VALID SCAN - CALCULATE ATTENDANCE STATUS
+                
+                // Get time in 12-hour format for DISPLAY
+                const currentTime12Hour = getFormattedTime12Hour(); // "2:35 PM"
+                
+                // Convert to 24-hour for COMPARISON
+                const currentTime24Hour = getFormattedTime24Hour(); // "14:35"
+                const lateTime24Hour = convertTo24Hour(attendanceRules.lateTime); // "14:00"
+                const absentTime24Hour = convertTo24Hour(attendanceRules.absentTime); // "15:00"
+                
+                console.log('🔍 Time Comparison Debug:');
+                console.log('Display Time (12-hour):', currentTime12Hour);
+                console.log('Comparison Time (24-hour):', currentTime24Hour);
+                console.log('Late Time (24-hour):', lateTime24Hour);
+                console.log('Absent Time (24-hour):', absentTime24Hour);
+                
+                // ✅ Compare using 24-hour format
+                let attendanceStatus = 'PRESENT';
+                
+                if (absentTime24Hour && currentTime24Hour > absentTime24Hour) {
+                    attendanceStatus = 'ABSENT';
+                    console.log('Result: ABSENT');
+                } else if (lateTime24Hour && currentTime24Hour > lateTime24Hour) {
+                    attendanceStatus = 'LATE';
+                    console.log('Result: LATE');
+                } else {
+                    console.log('Result: PRESENT');
+                }
+                
+                // Add all required fields
+                const teacher = SimpleLogin.getCurrentTeacher();
+                if (teacher) {
+                    studentInfo.scannedBy = teacher.fullName || teacher.username;
+                    studentInfo.scannedByUsername = teacher.username;
+                }
+                
+                // Store in 12-hour format for display
+                studentInfo.scannedTime = currentTime12Hour;
+                studentInfo.scanDateTime = new Date().toISOString();
+                studentInfo.location = 'School';
+                studentInfo.attendanceStatus = attendanceStatus; // ✅ SAVED!
+                
+                // Show success modal with status
                 const statusColors = {
                     'PRESENT': { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-300', icon: '✓' },
                     'LATE': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', icon: '⚠' },
                     'ABSENT': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: '✕' }
                 };
                 
-                const status = studentInfo.attendanceStatus || 'PRESENT';
-                const statusStyle = statusColors[status];
+                const statusStyle = statusColors[attendanceStatus];
                 
                 qrModalText.innerHTML = `
                     <div class="text-center">
@@ -985,63 +1059,22 @@ if (teacherData.scheduleStart && teacherData.lateTime && teacherData.absentTime)
                         <div class="mt-4 flex items-center justify-center">
                             <div class="px-4 py-2 ${statusStyle.bg} ${statusStyle.text} rounded-lg font-bold text-lg flex items-center gap-2">
                                 <span>${statusStyle.icon}</span>
-                                <span>${status}</span>
+                                <span>${attendanceStatus}</span>
                             </div>
                         </div>
                         
                         <p class="text-xs text-gray-500 dark:text-gray-400 mt-3">
-                            Scanned: ${studentInfo.scannedTime || new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}
+                            Scanned: ${currentTime12Hour}
                         </p>
                         <p class="text-xs text-gray-500 dark:text-gray-400">
                             By: ${studentInfo.scannedBy || 'Teacher'}
                         </p>
                     </div>
                 `;
-}
-
-if (!isValid) {
-// Update it to also show attendance status for wrong class:
-qrModalText.innerHTML = `
-    <div class="text-center">
-        <p class="text-2xl font-bold text-red-600">❌ Wrong Class!</p>
-        <p class="text-lg text-gray-700 mt-2">${studentInfo.name || 'Student'}</p>
-        <p class="text-sm text-gray-600 mt-1">${studentInfo.number || ''}</p>
-        <div class="bg-red-50 dark:bg-red-900/20 rounded-lg p-3 mt-3 text-left">
-            <p class="text-xs text-red-700 dark:text-red-300 font-semibold mb-1">Expected Class:</p>
-            <p class="text-xs text-red-600 dark:text-red-400">${teacherStrand} • ${teacherSection} • ${teacherGrade}</p>
-            <p class="text-xs text-red-700 dark:text-red-300 font-semibold mt-2 mb-1">Student's Class:</p>
-            <p class="text-xs text-red-600 dark:text-red-400">${studentStrand} • ${studentSection} • ${studentGrade}</p>
-            <p class="text-xs text-red-500 dark:text-red-400 mt-2 font-medium">${mismatchReason} - Attendance NOT recorded</p>
-        </div>
-    </div>
-`;
-    qrModal.classList.remove('hidden');
-    
-    // 🔥 CRITICAL FIX: Use setTimeout to reset immediately
-    setTimeout(() => {
-        qrModal.classList.add('hidden');
-        // Reset lastScannedCode to allow immediate re-scanning
-        lastScannedCode = null;
-    }, 800); // Short timeout for better UX
-    
-    // ⚠️ Important: Use requestAnimationFrame to continue scanning
-    requestAnimationFrame(loop);
-    return; // Stop processing this QR, but continue scanning
-}
                 
-                // ✅ VALID SCAN - PROCEED WITH SAVING
-                const teacher = SimpleLogin.getCurrentTeacher();
-                if (teacher) {
-                    studentInfo.scannedBy = teacher.fullName || teacher.username;
-                    studentInfo.scannedByUsername = teacher.username;
-                    studentInfo.scannedTime = new Date().toISOString();
-                    studentInfo.location = 'School';
-                }
-                
-
                 qrModal.classList.remove('hidden');
                 
-                // Save locally
+                // Save to localStorage
                 const timestamp = new Date().toLocaleString();
                 const qrDataWithTeacher = JSON.stringify(studentInfo);
                 
@@ -1067,10 +1100,9 @@ qrModalText.innerHTML = `
                     }
                 }
                 
-                // Auto-hide modal after 2 seconds, then allow scanning again
+                // Auto-hide modal after 2 seconds
                 setTimeout(() => {
                     qrModal.classList.add('hidden');
-                    // 🔥 FIX 4: Reset after 500ms delay para smooth
                     setTimeout(() => {
                         lastScannedCode = null;
                     }, 500);
@@ -1080,6 +1112,51 @@ qrModalText.innerHTML = `
         requestAnimationFrame(loop);
     }
     loop();
+}
+
+// ============================================
+// PUT THESE HELPER FUNCTIONS AT TOP OF FILE
+// ============================================
+// (Add right after other utility functions, before scanQR)
+
+function convertTo24Hour(timeStr) {
+    if (!timeStr) return null;
+    
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})/);
+    const periodMatch = timeStr.match(/(AM|PM|am|pm)/);
+    
+    if (!timeMatch) return null;
+    
+    let [, hours, minutes] = timeMatch;
+    hours = parseInt(hours);
+    
+    if (periodMatch) {
+        const isPM = /PM|pm/.test(periodMatch[0]);
+        if (isPM && hours !== 12) {
+            hours += 12;
+        } else if (!isPM && hours === 12) {
+            hours = 0;
+        }
+    }
+    
+    return String(hours).padStart(2, '0') + ':' + minutes;
+}
+
+function getFormattedTime12Hour() {
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours % 12 || 12;
+    
+    return `${displayHours}:${minutes} ${ampm}`;
+}
+
+function getFormattedTime24Hour() {
+    const now = new Date();
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
 }
 backToRoleTeacher.addEventListener('click', () => {
 stopCamera();
