@@ -417,23 +417,7 @@ teacherAttendanceForm.addEventListener('submit', function(e) {
     confirmTeacherSchedule.textContent = "Schedule: " + teacherData.schedule;
     confirmTeacherDateTime.textContent = "Date: " + teacherData.date;
     
-    // Add attendance rules
-    const attendanceRules = document.createElement('div');
-    attendanceRules.className = 'mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg';
-    attendanceRules.innerHTML = `
-        <p class="text-sm font-semibold text-yellow-700 dark:text-yellow-300">📋 Attendance Rules Applied:</p>
-        <p class="text-xs text-yellow-600 dark:text-yellow-400 mt-1">
-            • Present: Before ${teacherData.lateTime}<br>
-            • Late: ${teacherData.lateTime} to ${teacherData.absentTime}<br>
-            • Absent: After ${teacherData.absentTime}
-        </p>
-    `;
-    
-    // Find where to insert (after confirmation box or before button)
-    const confirmBox = document.querySelector('#teacherConfirmStep .bg-blue-50');
-    if (confirmBox) {
-        confirmBox.parentNode.insertBefore(attendanceRules, confirmBox.nextSibling);
-    }
+    // Attendance rules section removed - no longer displayed
     
     confirmAttendanceMarks.textContent = teacherData.late + " | " + teacherData.absent;
     
@@ -1078,10 +1062,18 @@ function scanQR() {
                 const timestamp = new Date().toLocaleString();
                 const qrDataWithTeacher = JSON.stringify(studentInfo);
                 
-                const isAlreadyScanned = scannedCodes.some(item => 
-                    JSON.parse(item.data).number === studentInfo.number &&
-                    new Date(item.timestamp).toDateString() === new Date().toDateString()
-                );
+                const isAlreadyScanned = scannedCodes.some(item => {
+    try {
+        const itemData = JSON.parse(item.data);
+        const itemDate = new Date(item.timestamp);
+        const currentDate = new Date();
+        
+        return itemData.number === studentInfo.number &&
+               itemDate.toDateString() === currentDate.toDateString();
+    } catch (e) {
+        return false; // Safe fallback
+    }
+});
                 
                 if (!isAlreadyScanned) {
                     scannedCodes.unshift({
