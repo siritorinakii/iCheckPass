@@ -2720,7 +2720,7 @@ function exportDashboardCSV() {
     });
     
     // CSV Headers - REMOVED "Scanned By" column
-    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Attendance Status,Teacher,Class Schedule\n';
+    let csv = 'Timestamp,Student Name,Student Number,Grade Level,Strand,Section,Attendance Status,Teacher\n';
     
     sortedScans.forEach(scan => {
         try {
@@ -2732,8 +2732,6 @@ function exportDashboardCSV() {
             // Get attendance status
             const status = data.attendanceStatus || 'PRESENT';
             
-            // Get class schedule if available
-            const classSchedule = data.classSchedule || teacherData.schedule || '';
             
             csv += `"${scan.timestamp}",`;
             csv += `"${data.name || ''}",`;
@@ -2743,7 +2741,6 @@ function exportDashboardCSV() {
             csv += `"${data.section || ''}",`;
             csv += `"${status}",`;
             csv += `"${teacherName}",`; // Teacher column
-            csv += `"${classSchedule}"\n`;
         } catch (e) {
             csv += `"${scan.timestamp}","Invalid QR Code","","N/A","","","ERROR","${teacherName}",""\n`;
         }
