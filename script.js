@@ -30,6 +30,28 @@ section.classList.add('hidden');
 previousPage.classList.remove('hidden');
 updateBackButton();
 }
+
+// Helper function to show download button after QR generation
+function showDownloadButton() {
+    setTimeout(() => {
+        const downloadBtn = document.getElementById('downloadQRBtn');
+        if (downloadBtn) {
+            downloadBtn.style.display = 'flex';
+        }
+    }, 300);
+}
+
+// Helper: update name/info labels shown on the QR card
+function updateQRCardLabels(data) {
+    const nameEl = document.getElementById('qrStudentName');
+    const infoEl = document.getElementById('qrStudentInfo');
+    if (nameEl) nameEl.textContent = data.name || '';
+    if (infoEl) {
+        const parts = [data.grade, data.strand, data.section ? 'Section ' + data.section : ''].filter(Boolean);
+        infoEl.textContent = parts.join(' • ');
+    }
+}
+
 // A Back Button Click
 backBtn.addEventListener('click', goBack);
 // Title Page or the Second Page that'll appear
@@ -226,6 +248,10 @@ confirmYesBtn.addEventListener('click', () => {
     
     // Save to localStorage
     localStorage.setItem("studentQR", qrData);
+    updateQRCardLabels(studentData);
+    
+    // Show download button
+    showDownloadButton();
     
     // Navigate to QR section
     pageHistory.push(qrCodeSection);
@@ -269,6 +295,10 @@ confirmYesBtn.addEventListener('click', () => {
     
     // Save to localStorage
     localStorage.setItem("studentQR", qrData);
+    updateQRCardLabels(studentData);
+    
+    // Show download button
+    showDownloadButton();
     
     // Navigate to QR section
     pageHistory.push(qrCodeSection);
@@ -489,6 +519,9 @@ if (regenerateQrBtn) regenerateQrBtn.addEventListener("click", () => {
         width: 250,
         height: 250 
     });
+
+    // Update the card labels
+    try { updateQRCardLabels(JSON.parse(newQRData)); } catch(e) {}
     
     alert("Your QR has been regenerated successfully!");
     
@@ -3213,7 +3246,7 @@ goBack = function() {
     originalGoBack();
 };
 
-// CONTACT FORM HANDLER
+// CONTACT FORM HANDLER WITH AUTO-REPLY
 document.getElementById('contactForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -3221,13 +3254,11 @@ document.getElementById('contactForm')?.addEventListener('submit', function(e) {
     const email = document.getElementById('contactEmail').value;
     const message = document.getElementById('contactMessage').value;
     
-
-    const subject = `iCheckPass Feedback`;
-    const body = message;
+    // Compose email with user's info in the body
+    const subject = `iCheckPass Feedback from ${name}`;
+    const body = `Name: ${name}\nEmail: ${email}\n\n---\n\n${message}\n\n---\nSent from iCheckPass`;
     
-    // Open default email client
-    window.location.href = `mailto:icheckpass2025@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
+    // Save to localStorage for record
     const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
     feedbacks.push({
         name: name,
@@ -3237,12 +3268,69 @@ document.getElementById('contactForm')?.addEventListener('submit', function(e) {
     });
     localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
     
-    // Show confirmation
-    alert('Thank you for your feedback!');
+    // Send auto-reply email to user using EmailJS
+    sendAutoReplyEmail(name, email, message);
+    
+    // Detect if mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Mobile: Try to open email app first
+        const mailtoLink = `mailto:icheckpass2025@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        // Try mailto first
+        window.location.href = mailtoLink;
+        
+        // If no email app, fallback to Gmail website after 2 seconds
+        setTimeout(() => {
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=icheckpass2025@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            window.open(gmailUrl, '_blank');
+        }, 2000);
+        
+        alert('Opening your email app... An email will be sent to you in a few minutes');
+        
+    } else {
+        // Desktop/Laptop: Always use Gmail website
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=icheckpass2025@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(gmailUrl, '_blank');
+        
+        alert('Gmail will open in a new tab. You will also receive an automated confirmation email shortly.');
+    }
     
     // Clear form
     this.reset();
 });
+
+// Function to send automated reply email using EmailJS
+function sendAutoReplyEmail(userName, userEmail, userMessage) {
+    // Initialize EmailJS (you'll need to replace these with your actual credentials)
+    // Get your keys from: https://www.emailjs.com/
+    
+    // IMPORTANT: Replace these with your actual EmailJS credentials
+    const EMAILJS_PUBLIC_KEY = 'y-xKQC2FijoL7bx7Z';  // From EmailJS dashboard
+    const EMAILJS_SERVICE_ID = 'service_gzy7q2l';   // From EmailJS dashboard
+    const EMAILJS_TEMPLATE_ID = 'template_yc768dv'; // From EmailJS dashboard
+    
+    // Initialize EmailJS with your public key
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    
+    // Template parameters to send to EmailJS
+    const templateParams = {
+        to_name: userName,           // User's name
+        to_email: userEmail,         // User's email (where auto-reply goes)
+        user_message: userMessage,   // Their original message
+        reply_to: 'icheckpass2025@gmail.com'
+    };
+    
+    // Send the email
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
+        .then(function(response) {
+            console.log('Auto-reply sent successfully!', response.status, response.text);
+        }, function(error) {
+            console.log('Failed to send auto-reply:', error);
+            // Don't show error to user, just log it
+        });
+}
 
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -3382,6 +3470,19 @@ qrDoneBtn.addEventListener('click', () => {
     console.log('QR Done → Back to Role Selection');
 });
 
+// ============================================
+// DOWNLOAD QR CODE BUTTON EVENT LISTENER
+// ============================================
+const downloadQRBtn = document.getElementById('downloadQRBtn');
+if (downloadQRBtn) {
+    downloadQRBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        downloadStudentQR();
+    });
+    console.log('✅ Download QR button initialized');
+}
+
 
 document.addEventListener('DOMContentLoaded', function() {
     console.log('iCheckPass loaded');
@@ -3445,6 +3546,10 @@ function simulateStudentContinue() {
         
         // 3. Show QR section
         qrCodeSection.classList.remove('hidden');
+        
+        // 3b. Update card labels and download button
+        updateQRCardLabels(studentData);
+        showDownloadButton();
         
         // 4. Enable QR Done button
         qrDoneBtn.disabled = false;
@@ -4478,3 +4583,153 @@ function applyAttendanceRules(studentInfo) {
 // Then in your scanQR function, when saving the scan:
 const attendanceStatus = applyAttendanceRules(studentInfo);
 studentInfo.attendanceStatus = attendanceStatus;
+
+// ============================================
+// DOWNLOAD QR CODE FUNCTION
+// ============================================
+
+function downloadStudentQR() {
+    const savedQR = localStorage.getItem('studentQR');
+    if (!savedQR) {
+        alert('No QR code data found. Please generate your QR code first.');
+        return;
+    }
+
+    try {
+        const studentData = JSON.parse(savedQR);
+        
+        // Get the QR code — prefer the canvas QRCode.js renders, fall back to img
+        const qrContainer = document.getElementById('qrcode');
+        const qrCanvas = qrContainer.querySelector('canvas');
+        const qrImg   = qrContainer.querySelector('img');
+
+        if (!qrCanvas && !qrImg) {
+            alert('QR code not found. Please regenerate your QR code.');
+            return;
+        }
+
+        // === BUILD CANVAS IMAGE (mobile-friendly PNG download) ===
+        const cardW = 500;
+        const cardH = 620;
+        const canvas = document.createElement('canvas');
+        canvas.width = cardW;
+        canvas.height = cardH;
+        const ctx = canvas.getContext('2d');
+
+        // ---- helper: draw everything once we have a valid source ----
+        function buildAndDownload(qrSource) {
+            // Background
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, cardW, cardH);
+
+            // Top header bar
+            ctx.fillStyle = '#2563eb';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, cardW, 80, [20, 20, 0, 0]);
+            ctx.fill();
+
+            // Header text - iCheckPass
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 28px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('iCheckPass', cardW / 2, 42);
+
+            // Header subtext - school name
+            ctx.font = '13px Arial';
+            ctx.fillStyle = '#bfdbfe';
+            ctx.fillText('Immaculate Conception Polytechnic, Meycauayan', cardW / 2, 65);
+
+            // Student name
+            ctx.fillStyle = '#1e3a8a';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            const displayName = studentData.name || 'Unknown Student';
+            ctx.fillText(displayName, cardW / 2, 116);
+
+            // Student number
+            ctx.fillStyle = '#64748b';
+            ctx.font = '14px Arial';
+            ctx.fillText(studentData.number || '', cardW / 2, 138);
+
+            // Info pills row
+            const strand  = studentData.strand  || '';
+            const grade   = studentData.grade   || '';
+            const section = studentData.section ? 'Section ' + studentData.section : '';
+            const pills      = [grade, strand, section].filter(Boolean);
+            const pillColors = ['#dbeafe', '#ede9fe', '#dcfce7'];
+            const textColors = ['#1d4ed8', '#6d28d9', '#15803d'];
+
+            pills.forEach((pill, i) => {
+                const pw = 120, ph = 24;
+                const totalW = pills.length * pw + (pills.length - 1) * 10;
+                const startX = (cardW - totalW) / 2;
+                const px = startX + i * (pw + 10);
+                const py = 152;
+                ctx.fillStyle = pillColors[i % pillColors.length];
+                ctx.beginPath();
+                ctx.roundRect(px, py, pw, ph, 12);
+                ctx.fill();
+                ctx.fillStyle = textColors[i % textColors.length];
+                ctx.font = 'bold 11px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(pill, px + pw / 2, py + 16);
+            });
+
+            // QR Code image draw
+            const qrSize = 260;
+            const qrX = (cardW - qrSize) / 2;
+            const qrY = 196;
+
+            // QR border box
+            ctx.fillStyle = '#f0f9ff';
+            ctx.strokeStyle = '#bfdbfe';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(qrX - 16, qrY - 16, qrSize + 32, qrSize + 32, 16);
+            ctx.fill();
+            ctx.stroke();
+
+            // Draw QR — from canvas (sharp) or img (fallback)
+            ctx.drawImage(qrSource, qrX, qrY, qrSize, qrSize);
+
+            // Bottom bar
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.roundRect(0, cardH - 60, cardW, 60, [0, 0, 20, 20]);
+            ctx.fill();
+
+            ctx.fillStyle = '#94a3b8';
+            ctx.font = '11px Arial';
+            ctx.textAlign = 'center';
+            const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
+            ctx.fillText('Generated: ' + dateStr + '  •  iCheckPass', cardW / 2, cardH - 32);
+            ctx.fillStyle = '#cbd5e1';
+            ctx.font = '10px Arial';
+            ctx.fillText('Show this to your teacher for attendance scanning', cardW / 2, cardH - 14);
+
+            // Trigger download
+            const safeName = displayName.replace(/[^a-zA-Z0-9]/g, '_');
+            const link = document.createElement('a');
+            link.download = `iCheckPass_QR_${safeName}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
+        // If QRCode.js canvas exists, use it directly (no load wait needed)
+        if (qrCanvas) {
+            buildAndDownload(qrCanvas);
+        } else {
+            // Fallback: img tag — wait for it to be fully loaded
+            if (qrImg.complete && qrImg.naturalWidth > 0) {
+                buildAndDownload(qrImg);
+            } else {
+                qrImg.onload = () => buildAndDownload(qrImg);
+                qrImg.onerror = () => alert('Could not load QR image. Please try again.');
+            }
+        }
+
+    } catch (error) {
+        console.error('Error downloading QR code:', error);
+        alert('Failed to download QR code. Please try again.');
+    }
+}
