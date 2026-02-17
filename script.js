@@ -3246,91 +3246,63 @@ goBack = function() {
     originalGoBack();
 };
 
-// CONTACT FORM HANDLER WITH AUTO-REPLY
+// CONTACT FORM HANDLER - Netlify Forms
 document.getElementById('contactForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
-    
+
     const name = document.getElementById('contactName').value;
     const email = document.getElementById('contactEmail').value;
     const message = document.getElementById('contactMessage').value;
-    
-    // Compose email with user's info in the body
-    const subject = `iCheckPass Feedback from ${name}`;
-    const body = `Name: ${name}\nEmail: ${email}\n\n---\n\n${message}\n\n---\nSent from iCheckPass`;
-    
-    // Save to localStorage for record
-    const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-    feedbacks.push({
-        name: name,
-        email: email,
-        message: message,
-        timestamp: new Date().toISOString()
-    });
-    localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
-    
-    // Send auto-reply email to user using EmailJS
-    sendAutoReplyEmail(name, email, message);
-    
-    // Detect if mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        // Mobile: Try to open email app first
-        const mailtoLink = `mailto:icheckpass2025@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        
-        // Try mailto first
-        window.location.href = mailtoLink;
-        
-        // If no email app, fallback to Gmail website after 2 seconds
-        setTimeout(() => {
-            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=icheckpass2025@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            window.open(gmailUrl, '_blank');
-        }, 2000);
-        
-        alert('Opening your email app... An email will be sent to you in a few minutes');
-        
-    } else {
-        // Desktop/Laptop: Always use Gmail website
-        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=icheckpass2025@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-        window.open(gmailUrl, '_blank');
-        
-        alert('Gmail will open in a new tab. You will also receive an automated confirmation email shortly.');
-    }
-    
-    // Clear form
-    this.reset();
-});
+    const submitBtn = this.querySelector('button[type="submit"]');
 
-// Function to send automated reply email using EmailJS
-function sendAutoReplyEmail(userName, userEmail, userMessage) {
-    // Initialize EmailJS (you'll need to replace these with your actual credentials)
-    // Get your keys from: https://www.emailjs.com/
-    
-    // IMPORTANT: Replace these with your actual EmailJS credentials
-    const EMAILJS_PUBLIC_KEY = 'y-xKQC2FijoL7bx7Z';  // From EmailJS dashboard
-    const EMAILJS_SERVICE_ID = 'service_gzy7q2l';   // From EmailJS dashboard
-    const EMAILJS_TEMPLATE_ID = 'template_yc768dv'; // From EmailJS dashboard
-    
-    // Initialize EmailJS with your public key
-    emailjs.init(EMAILJS_PUBLIC_KEY);
-    
-    // Template parameters to send to EmailJS
-    const templateParams = {
-        to_name: userName,           // User's name
-        to_email: userEmail,         // User's email (where auto-reply goes)
-        user_message: userMessage,   // Their original message
-        reply_to: 'icheckpass2025@gmail.com'
-    };
-    
-    // Send the email
-    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
-        .then(function(response) {
-            console.log('Auto-reply sent successfully!', response.status, response.text);
-        }, function(error) {
-            console.log('Failed to send auto-reply:', error);
-            // Don't show error to user, just log it
-        });
-}
+    // Disable button while submitting
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending...';
+
+    // Submit to Netlify Forms via fetch
+    const formData = new FormData();
+    formData.append('form-name', 'feedback');
+    formData.append('name', name);
+    formData.append('email', email);
+    formData.append('message', message);
+
+    fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams(formData).toString()
+    })
+    .then(() => {
+        // Save to localStorage for record
+        const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
+        feedbacks.push({ name, email, message, timestamp: new Date().toISOString() });
+        localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
+
+        // Show success message
+        submitBtn.textContent = '✓ Feedback Sent!';
+        submitBtn.style.background = '#10b981';
+
+        // Show inline success banner
+        const successMsg = document.createElement('div');
+        successMsg.style.cssText = 'background:#d1fae5;border:1px solid #6ee7b7;color:#065f46;padding:14px 18px;border-radius:10px;text-align:center;margin-top:10px;font-weight:600;';
+        successMsg.innerHTML = `✅ Thank you, ${name}! Your feedback has been received.<br><span style="font-weight:400;font-size:14px;">A confirmation email will be sent to <strong>${email}</strong> shortly.</span>`;
+        this.appendChild(successMsg);
+
+        // Reset form after 3 seconds
+        setTimeout(() => {
+            this.reset();
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Send Feedback';
+            submitBtn.style.background = '';
+            successMsg.remove();
+        }, 4000);
+    })
+    .catch((error) => {
+        console.error('Form submission error:', error);
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Send Feedback';
+        alert('Something went wrong. Please try again.');
+    });
+});
 
 
 document.addEventListener('DOMContentLoaded', function() {
