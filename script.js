@@ -3246,63 +3246,91 @@ goBack = function() {
     originalGoBack();
 };
 
-// CONTACT FORM HANDLER - Netlify Forms
+// CONTACT FORM HANDLER WITH AUTO-REPLY
 document.getElementById('contactForm')?.addEventListener('submit', function(e) {
     e.preventDefault();
-
+    
     const name = document.getElementById('contactName').value;
     const email = document.getElementById('contactEmail').value;
     const message = document.getElementById('contactMessage').value;
-    const submitBtn = this.querySelector('button[type="submit"]');
-
-    // Disable button while submitting
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending...';
-
-    // Submit to Netlify Forms via fetch
-    const formData = new FormData();
-    formData.append('form-name', 'feedback');
-    formData.append('name', name);
-    formData.append('email', email);
-    formData.append('message', message);
-
-    fetch('/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(formData).toString()
-    })
-    .then(() => {
-        // Save to localStorage for record
-        const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
-        feedbacks.push({ name, email, message, timestamp: new Date().toISOString() });
-        localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
-
-        // Show success message
-        submitBtn.textContent = '✓ Feedback Sent!';
-        submitBtn.style.background = '#10b981';
-
-        // Show inline success banner
-        const successMsg = document.createElement('div');
-        successMsg.style.cssText = 'background:#d1fae5;border:1px solid #6ee7b7;color:#065f46;padding:14px 18px;border-radius:10px;text-align:center;margin-top:10px;font-weight:600;';
-        successMsg.innerHTML = `✅ Thank you, ${name}! Your feedback has been received.<br><span style="font-weight:400;font-size:14px;">A confirmation email will be sent to <strong>${email}</strong> shortly.</span>`;
-        this.appendChild(successMsg);
-
-        // Reset form after 3 seconds
-        setTimeout(() => {
-            this.reset();
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Send Feedback';
-            submitBtn.style.background = '';
-            successMsg.remove();
-        }, 4000);
-    })
-    .catch((error) => {
-        console.error('Form submission error:', error);
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Send Feedback';
-        alert('Something went wrong. Please try again.');
+    
+    // Compose email with user's info in the body
+    const subject = `iCheckPass Feedback from ${name}`;
+    const body = `Name: ${name}\nEmail: ${email}\n\n---\n\n${message}\n\n---\nSent from iCheckPass`;
+    
+    // Save to localStorage for record
+    const feedbacks = JSON.parse(localStorage.getItem('feedbacks') || '[]');
+    feedbacks.push({
+        name: name,
+        email: email,
+        message: message,
+        timestamp: new Date().toISOString()
     });
+    localStorage.setItem('feedbacks', JSON.stringify(feedbacks));
+    
+    // Send auto-reply email to user using EmailJS
+    sendAutoReplyEmail(name, email, message);
+    
+    // Detect if mobile
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    if (isMobile) {
+        // Mobile: Try to open email app first
+        const mailtoLink = `mailto:icheckpass2025@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        
+        // Try mailto first
+        window.location.href = mailtoLink;
+        
+        // If no email app, fallback to Gmail website after 2 seconds
+        setTimeout(() => {
+            const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=icheckpass2025@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            window.open(gmailUrl, '_blank');
+        }, 2000);
+        
+        alert('Opening your email app... An email will be sent to you in a few minutes');
+        
+    } else {
+        // Desktop/Laptop: Always use Gmail website
+        const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=icheckpass2025@gmail.com&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+        window.open(gmailUrl, '_blank');
+        
+        alert('Gmail will open in a new tab. You will also receive an automated confirmation email shortly.');
+    }
+    
+    // Clear form
+    this.reset();
 });
+
+// Function to send automated reply email using EmailJS
+function sendAutoReplyEmail(userName, userEmail, userMessage) {
+    // Initialize EmailJS (you'll need to replace these with your actual credentials)
+    // Get your keys from: https://www.emailjs.com/
+    
+    // IMPORTANT: Replace these with your actual EmailJS credentials
+    const EMAILJS_PUBLIC_KEY = 'L7PWCOSCQsOzvXqOMTfJu';  // From EmailJS dashboard
+    const EMAILJS_SERVICE_ID = 'service_gzy7q2l';   // From EmailJS dashboard
+    const EMAILJS_TEMPLATE_ID = 'template_yc768dv'; // From EmailJS dashboard
+    
+    // Initialize EmailJS with your public key
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+    
+    // Template parameters to send to EmailJS
+    const templateParams = {
+        to_name: userName,           // User's name
+        to_email: userEmail,         // User's email (where auto-reply goes)
+        user_message: userMessage,   // Their original message
+        reply_to: 'icheckpass2025@gmail.com'
+    };
+    
+    // Send the email
+    emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
+        .then(function(response) {
+            console.log('Auto-reply sent successfully!', response.status, response.text);
+        }, function(error) {
+            console.log('Failed to send auto-reply:', error);
+            // Don't show error to user, just log it
+        });
+}
 
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -4569,133 +4597,268 @@ function downloadStudentQR() {
 
     try {
         const studentData = JSON.parse(savedQR);
-        
-        // Get the QR code — prefer the canvas QRCode.js renders, fall back to img
+
+        // Get QR source — prefer canvas (sharp), fallback to img
         const qrContainer = document.getElementById('qrcode');
-        const qrCanvas = qrContainer.querySelector('canvas');
-        const qrImg   = qrContainer.querySelector('img');
+        const qrCanvas    = qrContainer.querySelector('canvas');
+        const qrImg       = qrContainer.querySelector('img');
 
         if (!qrCanvas && !qrImg) {
             alert('QR code not found. Please regenerate your QR code.');
             return;
         }
 
-        // === BUILD CANVAS IMAGE (mobile-friendly PNG download) ===
-        const cardW = 500;
-        const cardH = 620;
-        const canvas = document.createElement('canvas');
-        canvas.width = cardW;
-        canvas.height = cardH;
-        const ctx = canvas.getContext('2d');
+        // ── Detect current theme ──────────────────────────────────────
+        const isDark = document.documentElement.classList.contains('dark');
 
-        // ---- helper: draw everything once we have a valid source ----
+        // ── Color palette (iCheckPass light vs dark) ──────────────────
+        const theme = isDark ? {
+            // Dark mode — deep navy background, white card tinted dark
+            outerBg:      '#0f172a',          // body dark bg
+            outerBg2:     '#1e293b',          // gradient end
+            cardBg:       '#1e293b',          // card surface
+            cardFooterBg: '#0f172a',          // card bottom strip
+            headerBg:     '#2563eb',          // blue header — same both modes
+            headerText:   '#ffffff',
+            headerSub:    '#bfdbfe',
+            divider:      '#334155',
+            labelText:    '#94a3b8',          // muted gray
+            nameText:     '#e0f2fe',          // light blue-white
+            numText:      '#93c5fd',          // soft blue
+            infoText:     '#60a5fa',          // medium blue
+            footerLabel:  '#64748b',
+            footerValue:  '#93c5fd',
+            footerSub:    '#475569',
+            brandText:    '#93c5fd',
+            brandSub:     'rgba(147,197,253,0.6)',
+            qrBg:         '#0f172a',
+            qrBorder:     '#2563eb',
+            qrDark:       '#e0f2fe',          // QR module color for dark mode
+            qrLight:      '#0f172a',
+        } : {
+            // Light mode — soft blue-white background
+            outerBg:      '#dbeafe',          // f0f9ff lightened for bg
+            outerBg2:     '#bfdbfe',
+            cardBg:       '#ffffff',
+            cardFooterBg: '#f0f9ff',
+            headerBg:     '#2563eb',
+            headerText:   '#ffffff',
+            headerSub:    '#bfdbfe',
+            divider:      '#e2e8f0',
+            labelText:    '#64748b',
+            nameText:     '#1e3a8a',
+            numText:      '#2563eb',
+            infoText:     '#3b82f6',
+            footerLabel:  '#64748b',
+            footerValue:  '#1e3a8a',
+            footerSub:    '#94a3b8',
+            brandText:    '#1e3a8a',
+            brandSub:     'rgba(30,58,138,0.5)',
+            qrBg:         '#f0f9ff',
+            qrBorder:     '#93c5fd',
+            qrDark:       '#000000',
+            qrLight:      '#ffffff',
+        };
+
+        // ── Canvas dimensions ─────────────────────────────────────────
+        const SCALE  = 2;
+        const imgW   = 420;
+        const imgH   = 780;
+        const cardW  = 360;
+        const cardH  = 640;
+        const cardX  = (imgW - cardW) / 2;
+        const cardY  = 36;
+        const R      = 24;   // card corner radius
+
+        const canvas  = document.createElement('canvas');
+        canvas.width  = imgW * SCALE;
+        canvas.height = imgH * SCALE;
+        const ctx     = canvas.getContext('2d');
+        ctx.scale(SCALE, SCALE);
+
+        // ── Helpers ───────────────────────────────────────────────────
+        function rr(x, y, w, h, r) {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.lineTo(x + w - r, y);
+            ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+            ctx.lineTo(x + w, y + h - r);
+            ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+            ctx.lineTo(x + r, y + h);
+            ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+            ctx.lineTo(x, y + r);
+            ctx.quadraticCurveTo(x, y, x + r, y);
+            ctx.closePath();
+        }
+
         function buildAndDownload(qrSource) {
-            // Background
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, cardW, cardH);
+            // ── Gradient background ───────────────────────────────────
+            const grad = ctx.createLinearGradient(0, 0, imgW, imgH);
+            grad.addColorStop(0, theme.outerBg);
+            grad.addColorStop(1, theme.outerBg2);
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, imgW, imgH);
 
-            // Top header bar
+            // Subtle diagonal accent stripe
+            ctx.save();
+            ctx.globalAlpha = isDark ? 0.08 : 0.12;
             ctx.fillStyle = '#2563eb';
             ctx.beginPath();
-            ctx.roundRect(0, 0, cardW, 80, [20, 20, 0, 0]);
+            ctx.moveTo(0, imgH * 0.55);
+            ctx.lineTo(imgW, imgH * 0.3);
+            ctx.lineTo(imgW, imgH);
+            ctx.lineTo(0, imgH);
+            ctx.closePath();
             ctx.fill();
+            ctx.restore();
 
-            // Header text - iCheckPass
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 28px Arial';
+            // ── White / dark card ─────────────────────────────────────
+            ctx.shadowColor = isDark ? 'rgba(0,0,0,0.6)' : 'rgba(37,99,235,0.18)';
+            ctx.shadowBlur  = 32;
+            ctx.shadowOffsetY = 8;
+            ctx.fillStyle = theme.cardBg;
+            rr(cardX, cardY, cardW, cardH, R);
+            ctx.fill();
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur  = 0;
+            ctx.shadowOffsetY = 0;
+
+            // ── Card header bar ───────────────────────────────────────
+            ctx.fillStyle = theme.headerBg;
+            rr(cardX, cardY, cardW, 84, R);
+            // fill bottom corners of header (square)
+            ctx.fill();
+            ctx.fillRect(cardX, cardY + 60, cardW, 24);
+
+            ctx.fillStyle = theme.headerText;
+            ctx.font      = 'bold 24px Arial';
             ctx.textAlign = 'center';
-            ctx.fillText('iCheckPass', cardW / 2, 42);
+            ctx.fillText('iCheckPass', cardX + cardW / 2, cardY + 36);
 
-            // Header subtext - school name
-            ctx.font = '13px Arial';
-            ctx.fillStyle = '#bfdbfe';
-            ctx.fillText('Immaculate Conception Polytechnic, Meycauayan', cardW / 2, 65);
+            ctx.font      = '11px Arial';
+            ctx.fillStyle = theme.headerSub;
+            ctx.fillText('ICP Meycauayan', cardX + cardW / 2, cardY + 60);
 
-            // Student name
-            ctx.fillStyle = '#1e3a8a';
-            ctx.font = 'bold 20px Arial';
-            ctx.textAlign = 'center';
-            const displayName = studentData.name || 'Unknown Student';
-            ctx.fillText(displayName, cardW / 2, 116);
+            // ── Center QR + info block in available space ─────────────
+            // Available space: from end of header (cardY+84) to start of footer (cardY+cardH-72)
+            // = cardH - 84 - 72 = 484px
+            // Content block:
+            //   QR border box: 220 + 32 = 252px
+            //   gap after QR box: 24px
+            //   divider: 1px
+            //   name (18px line, 34px from divider): ~34px
+            //   number (13px line): ~22px
+            //   info (12px line): ~22px
+            //   bottom padding: 10px
+            // Total content: 252 + 24 + 1 + 34 + 22 + 22 + 10 = 365px
+            // Top offset to center: (484 - 365) / 2 = 59px from header bottom
+            const headerBottom = cardY + 84;
+            const footerTop    = cardY + cardH - 72;
+            const midSpace     = footerTop - headerBottom;           // 484
+            const qrSize       = 220;
+            const qrBoxH       = qrSize + 32;                        // 252
+            const infoBlockH   = 24 + 1 + 34 + 22 + 22 + 10;        // ~113
+            const totalContent = qrBoxH + infoBlockH;                // 365
+            const topOffset    = (midSpace - totalContent) / 2;      // ~60
+            const qrBoxY       = headerBottom + topOffset;           // top of QR border box
+            const qrX          = cardX + (cardW - qrSize) / 2;
+            const qrY2         = qrBoxY + 16;                        // QR image inside box
 
-            // Student number
-            ctx.fillStyle = '#64748b';
-            ctx.font = '14px Arial';
-            ctx.fillText(studentData.number || '', cardW / 2, 138);
-
-            // Info pills row
-            const strand  = studentData.strand  || '';
-            const grade   = studentData.grade   || '';
-            const section = studentData.section ? 'Section ' + studentData.section : '';
-            const pills      = [grade, strand, section].filter(Boolean);
-            const pillColors = ['#dbeafe', '#ede9fe', '#dcfce7'];
-            const textColors = ['#1d4ed8', '#6d28d9', '#15803d'];
-
-            pills.forEach((pill, i) => {
-                const pw = 120, ph = 24;
-                const totalW = pills.length * pw + (pills.length - 1) * 10;
-                const startX = (cardW - totalW) / 2;
-                const px = startX + i * (pw + 10);
-                const py = 152;
-                ctx.fillStyle = pillColors[i % pillColors.length];
-                ctx.beginPath();
-                ctx.roundRect(px, py, pw, ph, 12);
-                ctx.fill();
-                ctx.fillStyle = textColors[i % textColors.length];
-                ctx.font = 'bold 11px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(pill, px + pw / 2, py + 16);
-            });
-
-            // QR Code image draw
-            const qrSize = 260;
-            const qrX = (cardW - qrSize) / 2;
-            const qrY = 196;
-
-            // QR border box
-            ctx.fillStyle = '#f0f9ff';
-            ctx.strokeStyle = '#bfdbfe';
-            ctx.lineWidth = 2;
-            ctx.beginPath();
-            ctx.roundRect(qrX - 16, qrY - 16, qrSize + 32, qrSize + 32, 16);
+            ctx.fillStyle   = theme.qrBg;
+            ctx.strokeStyle = theme.qrBorder;
+            ctx.lineWidth   = 1.5;
+            rr(qrX - 16, qrBoxY, qrSize + 32, qrBoxH, 14);
             ctx.fill();
             ctx.stroke();
 
-            // Draw QR — from canvas (sharp) or img (fallback)
-            ctx.drawImage(qrSource, qrX, qrY, qrSize, qrSize);
+            ctx.drawImage(qrSource, qrX, qrY2, qrSize, qrSize);
 
-            // Bottom bar
-            ctx.fillStyle = '#f8fafc';
+            // ── Divider ───────────────────────────────────────────────
+            const divY = qrBoxY + qrBoxH + 24;
+            ctx.strokeStyle = theme.divider;
+            ctx.lineWidth   = 1;
             ctx.beginPath();
-            ctx.roundRect(0, cardH - 60, cardW, 60, [0, 0, 20, 20]);
-            ctx.fill();
+            ctx.moveTo(cardX + 20, divY);
+            ctx.lineTo(cardX + cardW - 20, divY);
+            ctx.stroke();
 
-            ctx.fillStyle = '#94a3b8';
-            ctx.font = '11px Arial';
+            // ── Student name ──────────────────────────────────────────
+            const displayName = studentData.name || 'Unknown Student';
+            ctx.fillStyle = theme.nameText;
+            ctx.font      = 'bold 18px Arial';
             ctx.textAlign = 'center';
-            const dateStr = new Date().toLocaleDateString('en-PH', { year: 'numeric', month: 'long', day: 'numeric' });
-            ctx.fillText('Generated: ' + dateStr + '  •  iCheckPass', cardW / 2, cardH - 32);
-            ctx.fillStyle = '#cbd5e1';
-            ctx.font = '10px Arial';
-            ctx.fillText('Show this to your teacher for attendance scanning', cardW / 2, cardH - 14);
+            ctx.fillText(displayName, cardX + cardW / 2, divY + 30);
 
-            // Trigger download
+            // ── Student number ────────────────────────────────────────
+            ctx.fillStyle = theme.numText;
+            ctx.font      = '13px Arial';
+            ctx.fillText(studentData.number || '', cardX + cardW / 2, divY + 52);
+
+            // ── Info line ─────────────────────────────────────────────
+            const grade   = studentData.grade   || '';
+            const strand  = studentData.strand  || '';
+            const section = studentData.section ? 'Section ' + studentData.section : '';
+            const info    = [grade, strand, section].filter(Boolean).join('  •  ');
+            ctx.fillStyle = theme.infoText;
+            ctx.font      = '12px Arial';
+            ctx.fillText(info, cardX + cardW / 2, divY + 72);
+
+            // ── Footer strip (Tala "total" style) ─────────────────────
+            const ftY  = cardY + cardH - 72;
+            ctx.fillStyle = theme.cardFooterBg;
+            rr(cardX, ftY, cardW, 72, R);
+            // square off top corners of footer
+            ctx.fill();
+            ctx.fillRect(cardX, ftY, cardW, 24);
+
+            // Thin divider above footer
+            ctx.strokeStyle = theme.divider;
+            ctx.lineWidth   = 1;
+            ctx.beginPath();
+            ctx.moveTo(cardX + 20, ftY);
+            ctx.lineTo(cardX + cardW - 20, ftY);
+            ctx.stroke();
+
+            const dateStr = new Date().toLocaleDateString('en-PH', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            ctx.fillStyle = theme.footerLabel;
+            ctx.font      = '13px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Generated', cardX + 24, ftY + 28);
+
+            ctx.fillStyle = theme.footerValue;
+            ctx.font      = 'bold 13px Arial';
+            ctx.textAlign = 'right';
+            ctx.fillText(dateStr, cardX + cardW - 24, ftY + 28);
+
+            ctx.fillStyle = theme.footerSub;
+            ctx.font      = '11px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('Show to your teacher for attendance scanning', cardX + cardW / 2, ftY + 52);
+
+            // ── Brand text below card — just iCheckPass, no subtitle ──
+            ctx.fillStyle = theme.brandText;
+            ctx.font      = 'bold 38px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('iCheckPass', imgW / 2, cardY + cardH + 64);
+
+            // ── Download ──────────────────────────────────────────────
             const safeName = displayName.replace(/[^a-zA-Z0-9]/g, '_');
-            const link = document.createElement('a');
-            link.download = `iCheckPass_QR_${safeName}.png`;
-            link.href = canvas.toDataURL('image/png');
+            const link     = document.createElement('a');
+            link.download  = `iCheckPass_QR_${safeName}.png`;
+            link.href      = canvas.toDataURL('image/png');
             link.click();
         }
 
-        // If QRCode.js canvas exists, use it directly (no load wait needed)
         if (qrCanvas) {
             buildAndDownload(qrCanvas);
         } else {
-            // Fallback: img tag — wait for it to be fully loaded
             if (qrImg.complete && qrImg.naturalWidth > 0) {
                 buildAndDownload(qrImg);
             } else {
-                qrImg.onload = () => buildAndDownload(qrImg);
+                qrImg.onload  = () => buildAndDownload(qrImg);
                 qrImg.onerror = () => alert('Could not load QR image. Please try again.');
             }
         }

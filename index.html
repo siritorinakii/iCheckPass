@@ -7,6 +7,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <!-- EmailJS SDK for automated email responses -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
     <link rel="stylesheet" href="style.css" />
 </head>
 
@@ -716,22 +718,18 @@
         Have feedback or encountered an issue? Reach out to us—your insights help us make iCheckPass better.
     </p>
     
-    <form id="contactForm" name="feedback" method="POST" data-netlify="true" data-netlify-honeypot="bot-field" class="space-y-4 max-w-md mx-auto">
-        <!-- Netlify hidden fields -->
-        <input type="hidden" name="form-name" value="feedback" />
-        <p class="hidden"><input name="bot-field" /></p>
-
+    <form id="contactForm" class="space-y-4 max-w-md mx-auto">
         <div>
             <label class="block text-blue-700 font-semibold text-left">Your Name</label>
-            <input id="contactName" name="name" type="text" placeholder="Your name" required class="w-full border rounded p-2" />
+            <input id="contactName" type="text" placeholder="Your name" required class="w-full border rounded p-2" />
         </div>
         <div>
             <label class="block text-blue-700 font-semibold text-left">Your Email</label>
-            <input id="contactEmail" name="email" type="email" placeholder="your@email.com" required class="w-full border rounded p-2" />
+            <input id="contactEmail" type="email" placeholder="your@email.com" required class="w-full border rounded p-2" />
         </div>
         <div>
             <label class="block text-blue-700 font-semibold text-left">Message</label>
-            <textarea id="contactMessage" name="message" rows="4" placeholder="Write your feedback or concern here..." required class="w-full border rounded p-2"></textarea>
+            <textarea id="contactMessage" rows="4" placeholder="Write your feedback or concern here..." required class="w-full border rounded p-2"></textarea>
         </div>
         <button type="submit" class="btn-primary w-full">Send Feedback</button>
     </form>
