@@ -4698,7 +4698,7 @@ function downloadStudentQR() {
 
             ctx.font      = '11px Arial';
             ctx.fillStyle = theme.headerSub;
-            ctx.fillText('ICP Meycauayan', cardX + cardW / 2, cardY + 60);
+            ctx.fillText('Immaculate Conception Polytechnic, Meycauayan', cardX + cardW / 2, cardY + 60);
 
             // ── Center QR + info block in available space ─────────────
             const headerBottom = cardY + 84;
