@@ -4613,31 +4613,25 @@ function downloadStudentQR() {
 
         // ── Color palette (iCheckPass light vs dark) ──────────────────
         const theme = isDark ? {
-            // Dark mode — deep navy background, white card tinted dark
-            outerBg:      '#0f172a',          // body dark bg
-            outerBg2:     '#1e293b',          // gradient end
-            cardBg:       '#1e293b',          // card surface
-            cardFooterBg: '#0f172a',          // card bottom strip
-            headerBg:     '#2563eb',          // blue header — same both modes
+            outerBg:      '#0f172a',
+            outerBg2:     '#1e293b',
+            cardBg:       '#1e293b',
+            cardFooterBg: '#0f172a',
+            headerBg:     '#2563eb',
             headerText:   '#ffffff',
             headerSub:    '#bfdbfe',
             divider:      '#334155',
-            labelText:    '#94a3b8',          // muted gray
-            nameText:     '#e0f2fe',          // light blue-white
-            numText:      '#93c5fd',          // soft blue
-            infoText:     '#60a5fa',          // medium blue
+            nameText:     '#e0f2fe',
+            numText:      '#93c5fd',
+            infoText:     '#60a5fa',
             footerLabel:  '#64748b',
             footerValue:  '#93c5fd',
             footerSub:    '#475569',
             brandText:    '#93c5fd',
-            brandSub:     'rgba(147,197,253,0.6)',
             qrBg:         '#0f172a',
             qrBorder:     '#2563eb',
-            qrDark:       '#e0f2fe',          // QR module color for dark mode
-            qrLight:      '#0f172a',
         } : {
-            // Light mode — soft blue-white background
-            outerBg:      '#dbeafe',          // f0f9ff lightened for bg
+            outerBg:      '#dbeafe',
             outerBg2:     '#bfdbfe',
             cardBg:       '#ffffff',
             cardFooterBg: '#f0f9ff',
@@ -4645,7 +4639,6 @@ function downloadStudentQR() {
             headerText:   '#ffffff',
             headerSub:    '#bfdbfe',
             divider:      '#e2e8f0',
-            labelText:    '#64748b',
             nameText:     '#1e3a8a',
             numText:      '#2563eb',
             infoText:     '#3b82f6',
@@ -4653,11 +4646,8 @@ function downloadStudentQR() {
             footerValue:  '#1e3a8a',
             footerSub:    '#94a3b8',
             brandText:    '#1e3a8a',
-            brandSub:     'rgba(30,58,138,0.5)',
             qrBg:         '#f0f9ff',
             qrBorder:     '#93c5fd',
-            qrDark:       '#000000',
-            qrLight:      '#ffffff',
         };
 
         // ── Canvas dimensions ─────────────────────────────────────────
@@ -4668,7 +4658,7 @@ function downloadStudentQR() {
         const cardH  = 640;
         const cardX  = (imgW - cardW) / 2;
         const cardY  = 36;
-        const R      = 24;   // card corner radius
+        const R      = 24;
 
         const canvas  = document.createElement('canvas');
         canvas.width  = imgW * SCALE;
@@ -4676,7 +4666,7 @@ function downloadStudentQR() {
         const ctx     = canvas.getContext('2d');
         ctx.scale(SCALE, SCALE);
 
-        // ── Helpers ───────────────────────────────────────────────────
+        // ── Helper: rounded rect ──────────────────────────────────────
         function rr(x, y, w, h, r) {
             ctx.beginPath();
             ctx.moveTo(x + r, y);
@@ -4712,7 +4702,7 @@ function downloadStudentQR() {
             ctx.fill();
             ctx.restore();
 
-            // ── White / dark card ─────────────────────────────────────
+            // ── Card with shadow ──────────────────────────────────────
             ctx.shadowColor = isDark ? 'rgba(0,0,0,0.6)' : 'rgba(37,99,235,0.18)';
             ctx.shadowBlur  = 32;
             ctx.shadowOffsetY = 8;
@@ -4723,10 +4713,9 @@ function downloadStudentQR() {
             ctx.shadowBlur  = 0;
             ctx.shadowOffsetY = 0;
 
-            // ── Card header bar ───────────────────────────────────────
+            // ── Header bar ────────────────────────────────────────────
             ctx.fillStyle = theme.headerBg;
             rr(cardX, cardY, cardW, 84, R);
-            // fill bottom corners of header (square)
             ctx.fill();
             ctx.fillRect(cardX, cardY + 60, cardW, 24);
 
@@ -4740,29 +4729,17 @@ function downloadStudentQR() {
             ctx.fillText('ICP Meycauayan', cardX + cardW / 2, cardY + 60);
 
             // ── Center QR + info block in available space ─────────────
-            // Available space: from end of header (cardY+84) to start of footer (cardY+cardH-72)
-            // = cardH - 84 - 72 = 484px
-            // Content block:
-            //   QR border box: 220 + 32 = 252px
-            //   gap after QR box: 24px
-            //   divider: 1px
-            //   name (18px line, 34px from divider): ~34px
-            //   number (13px line): ~22px
-            //   info (12px line): ~22px
-            //   bottom padding: 10px
-            // Total content: 252 + 24 + 1 + 34 + 22 + 22 + 10 = 365px
-            // Top offset to center: (484 - 365) / 2 = 59px from header bottom
             const headerBottom = cardY + 84;
             const footerTop    = cardY + cardH - 72;
-            const midSpace     = footerTop - headerBottom;           // 484
+            const midSpace     = footerTop - headerBottom;
             const qrSize       = 220;
-            const qrBoxH       = qrSize + 32;                        // 252
-            const infoBlockH   = 24 + 1 + 34 + 22 + 22 + 10;        // ~113
-            const totalContent = qrBoxH + infoBlockH;                // 365
-            const topOffset    = (midSpace - totalContent) / 2;      // ~60
-            const qrBoxY       = headerBottom + topOffset;           // top of QR border box
+            const qrBoxH       = qrSize + 32;
+            const infoBlockH   = 24 + 1 + 34 + 22 + 22 + 10;
+            const totalContent = qrBoxH + infoBlockH;
+            const topOffset    = (midSpace - totalContent) / 2;
+            const qrBoxY       = headerBottom + topOffset;
             const qrX          = cardX + (cardW - qrSize) / 2;
-            const qrY2         = qrBoxY + 16;                        // QR image inside box
+            const qrY2         = qrBoxY + 16;
 
             ctx.fillStyle   = theme.qrBg;
             ctx.strokeStyle = theme.qrBorder;
@@ -4803,15 +4780,13 @@ function downloadStudentQR() {
             ctx.font      = '12px Arial';
             ctx.fillText(info, cardX + cardW / 2, divY + 72);
 
-            // ── Footer strip (Tala "total" style) ─────────────────────
+            // ── Footer strip ──────────────────────────────────────────
             const ftY  = cardY + cardH - 72;
             ctx.fillStyle = theme.cardFooterBg;
             rr(cardX, ftY, cardW, 72, R);
-            // square off top corners of footer
             ctx.fill();
             ctx.fillRect(cardX, ftY, cardW, 24);
 
-            // Thin divider above footer
             ctx.strokeStyle = theme.divider;
             ctx.lineWidth   = 1;
             ctx.beginPath();
@@ -4838,7 +4813,7 @@ function downloadStudentQR() {
             ctx.textAlign = 'center';
             ctx.fillText('Show to your teacher for attendance scanning', cardX + cardW / 2, ftY + 52);
 
-            // ── Brand text below card — just iCheckPass, no subtitle ──
+            // ── Brand text below card ─────────────────────────────────
             ctx.fillStyle = theme.brandText;
             ctx.font      = 'bold 38px Arial';
             ctx.textAlign = 'center';
